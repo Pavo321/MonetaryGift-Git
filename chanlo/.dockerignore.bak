@@ -1,0 +1,13 @@
+src/
+pom.xml
+mvnw
+mvnw.cmd
+.git
+.gitignore
+*.md
+target/classes/
+target/generated-sources/
+target/generated-test-sources/
+target/test-classes/
+!target/*.jar
+
