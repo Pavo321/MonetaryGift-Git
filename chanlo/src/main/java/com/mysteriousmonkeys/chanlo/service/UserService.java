@@ -68,10 +68,14 @@ public class UserService {
     public User updateUser(int userId, UserCreateRequest request) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
-        
+
         user.setName(request.name());
         user.setVillage(request.village());
-        
+
+        return userRepository.save(user);
+    }
+
+    public User saveUser(User user) {
         return userRepository.save(user);
     }
     

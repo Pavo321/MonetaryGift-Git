@@ -1,6 +1,6 @@
 package com.mysteriousmonkeys.chanlo.dto;
 
-import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
@@ -11,7 +11,7 @@ import java.time.LocalDate;
  */
 public record WhatsAppCreateEventRequest(
     @NotNull String eventName,
-    @NotNull @Future LocalDate eventDate,
+    @NotNull @FutureOrPresent LocalDate eventDate,
     @NotNull String hostPhoneNumber,
     @NotNull String hostUpiId,
     String thankYouMessage

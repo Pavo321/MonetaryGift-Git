@@ -15,6 +15,7 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -34,12 +35,29 @@ public class EventService {
     @Autowired
     private MoneyRepository moneyRepository;
     
+    @Value("${app.base.url:http://localhost:8080}")
+    private String baseUrl;
+    
     public Event createEvent(EventCreateRequest request) {
         log.info("Creating event: {}", request.eventName());
-        
+
+        // Validate date range
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (request.eventDate().isBefore(today)) {
+            throw new RuntimeException("Event date cannot be in the past. Please select today or a future date.");
+        }
+        if (request.eventDate().isAfter(today.plusYears(5))) {
+            throw new RuntimeException("Event date cannot be more than 5 years from today.");
+        }
+
         var host = userRepository.findById(request.hostId())
             .orElseThrow(() -> new UserNotFoundException("Host not found"));
-        
+
+        // Check for duplicate event name on the same date for this host
+        if (eventRepository.existsByHostAndEventNameAndEventDate(host, request.eventName(), request.eventDate())) {
+            throw new RuntimeException("You already have an event named \"" + request.eventName() + "\" on " + request.eventDate() + ". Please choose a different name or date.");
+        }
+
         Event event = new Event();
         event.setEventName(request.eventName());
         event.setEventDate(request.eventDate());
@@ -56,7 +74,14 @@ public class EventService {
         
         // Generate QR code data after save (needs ID)
         savedEvent.setQrCodeData("EVENT_" + savedEvent.getEventId());
+        
+        // Set QR code image URL pointing to the endpoint that serves the QR code
+        String qrCodeImageUrl = baseUrl + "/chanla/events/" + savedEvent.getEventId() + "/qr";
+        savedEvent.setQrCodeImageUrl(qrCodeImageUrl);
+        
         eventRepository.save(savedEvent);
+        
+        log.info("Event created with QR code URL: {}", qrCodeImageUrl);
         
         return savedEvent;
     }
@@ -64,6 +89,13 @@ public class EventService {
     public EventResponse getEventWithStats(int eventId) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        
+        // Ensure QR code image URL is set (for existing events that might not have it)
+        if (event.getQrCodeImageUrl() == null || event.getQrCodeImageUrl().isEmpty()) {
+            String qrCodeImageUrl = baseUrl + "/chanla/events/" + event.getEventId() + "/qr";
+            event.setQrCodeImageUrl(qrCodeImageUrl);
+            eventRepository.save(event);
+        }
         
         Long totalAmount = moneyRepository.getTotalAmountByEvent(event);
         if (totalAmount == null) {

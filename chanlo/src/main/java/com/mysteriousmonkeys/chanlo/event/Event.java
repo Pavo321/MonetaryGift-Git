@@ -3,7 +3,7 @@ package com.mysteriousmonkeys.chanlo.event;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.mysteriousmonkeys.chanlo.user.User;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.data.annotation.CreatedDate;
@@ -27,7 +27,7 @@ public class Event {
     private User host;
     
     @NotNull
-    @Future
+    @FutureOrPresent
     private LocalDate eventDate;
     
     private String qrCodeData;
@@ -36,7 +36,7 @@ public class Event {
     private String hostUpiId;
     
     @Size(max = 500)
-    private String thankYouMessage = "Thank you for blessing our wedding!";
+    private String thankYouMessage = "Thank you for your generous contribution!";
     
     @Enumerated(EnumType.STRING)
     private EventStatus status = EventStatus.ACTIVE;
@@ -60,7 +60,7 @@ public class Event {
         this.host = host;
         this.eventDate = eventDate;
         this.status = EventStatus.ACTIVE;
-        this.thankYouMessage = "Thank you for blessing our wedding!";
+        this.thankYouMessage = "Thank you for your generous contribution!";
     }
 
     public int getEventId() {

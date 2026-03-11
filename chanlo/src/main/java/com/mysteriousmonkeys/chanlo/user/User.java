@@ -27,6 +27,14 @@ public class User {
     @Pattern(regexp = "^\\d{10}$")
     private String phoneNumber;
 
+    private String email;
+
+    private String pincode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "managed_by", referencedColumnName = "id")
+    private User managedBy;
+
     @Enumerated(EnumType.STRING)
     private UserRole role = UserRole.GUEST;
 
@@ -102,10 +110,47 @@ public class User {
         return user;
     }
 
+    public static User createHost(String name, String village, String phoneNumber) {
+        User user = new User(name, village, phoneNumber);
+        user.setRole(UserRole.HOST);
+        return user;
+    }
+
     public static User createOrganizer(String name, String village, String phoneNumber) {
         User user = new User(name, village, phoneNumber);
         user.setRole(UserRole.ORGANIZER);
         return user;
+    }
+
+    public static User createManagedPerson(String name, String village, String phoneNumber, User managedBy) {
+        User user = new User(name, village, phoneNumber);
+        user.setRole(UserRole.GUEST);
+        user.setManagedBy(managedBy);
+        return user;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPincode() {
+        return pincode;
+    }
+
+    public void setPincode(String pincode) {
+        this.pincode = pincode;
+    }
+
+    public User getManagedBy() {
+        return managedBy;
+    }
+
+    public void setManagedBy(User managedBy) {
+        this.managedBy = managedBy;
     }
 
     @Override

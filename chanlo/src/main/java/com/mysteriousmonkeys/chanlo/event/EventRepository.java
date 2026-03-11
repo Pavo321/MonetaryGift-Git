@@ -12,4 +12,5 @@ public interface EventRepository extends JpaRepository<Event, Integer> {
     List<Event> findByStatus(EventStatus status);
     Optional<Event> findByQrCodeData(String qrCodeData);
     List<Event> findByEventDateBetween(LocalDate start, LocalDate end);
+    boolean existsByHostAndEventNameAndEventDate(User host, String eventName, LocalDate eventDate);
 }

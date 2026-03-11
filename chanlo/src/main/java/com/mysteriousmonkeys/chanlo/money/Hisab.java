@@ -24,7 +24,14 @@ public class Hisab {
     @ManyToOne
     @JoinColumn(name = "guestId", referencedColumnName = "id")
     private User guest;
+
+    @ManyToOne
+    @JoinColumn(name = "collected_by", referencedColumnName = "id")
+    private User collectedBy;
+
     private Long amount;
+
+    private String verificationQrData;
     
     @Enumerated(EnumType.STRING)
     private PaymentMethod paymentMethod;
@@ -128,6 +135,22 @@ public class Hisab {
 
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public User getCollectedBy() {
+        return collectedBy;
+    }
+
+    public void setCollectedBy(User collectedBy) {
+        this.collectedBy = collectedBy;
+    }
+
+    public String getVerificationQrData() {
+        return verificationQrData;
+    }
+
+    public void setVerificationQrData(String verificationQrData) {
+        this.verificationQrData = verificationQrData;
     }
 
     public void markAsSuccess(String transactionId, LocalDateTime completedAt) {

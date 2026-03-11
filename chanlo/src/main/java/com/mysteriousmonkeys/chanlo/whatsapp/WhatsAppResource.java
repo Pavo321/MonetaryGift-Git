@@ -2,11 +2,12 @@ package com.mysteriousmonkeys.chanlo.whatsapp;
 
 import com.mysteriousmonkeys.chanlo.dto.*;
 import com.mysteriousmonkeys.chanlo.event.Event;
+import com.mysteriousmonkeys.chanlo.exception.EventNotFoundException;
+import com.mysteriousmonkeys.chanlo.exception.QRCodeException;
 import com.mysteriousmonkeys.chanlo.exception.UserNotFoundException;
 import com.mysteriousmonkeys.chanlo.money.Hisab;
-import com.mysteriousmonkeys.chanlo.service.EventService;
-import com.mysteriousmonkeys.chanlo.service.HisabService;
-import com.mysteriousmonkeys.chanlo.service.UserService;
+import com.mysteriousmonkeys.chanlo.money.PaymentMethod;
+import com.mysteriousmonkeys.chanlo.service.*;
 import com.mysteriousmonkeys.chanlo.user.User;
 import com.mysteriousmonkeys.chanlo.user.UserRepository;
 import com.mysteriousmonkeys.chanlo.user.UserRole;
@@ -14,9 +15,13 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.util.List;
 
 /**
@@ -32,15 +37,24 @@ public class WhatsAppResource {
     
     @Autowired
     private UserService userService;
-    
+
     @Autowired
     private UserRepository userRepository;
-    
+
     @Autowired
     private EventService eventService;
-    
+
     @Autowired
     private HisabService hisabService;
+
+    @Autowired
+    private QRCodeService qrCodeService;
+
+    @Autowired
+    private UpiCollectService upiCollectService;
+
+    @Autowired
+    private WhatsAppApiService whatsAppApiService;
     
     /**
      * Create or get user by phone number
@@ -269,6 +283,220 @@ public class WhatsAppResource {
         }
         
         return ResponseEntity.ok(qrCodeData);
+    }
+
+    /**
+     * Serve guest QR code image publicly (for WhatsApp URL-based image sending).
+     * WhatsApp servers fetch this URL to deliver the image to the user.
+     * GET /whatsapp/guest-qr/{userId}
+     */
+    @GetMapping(value = "/guest-qr/{userId}", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> getGuestQR(@PathVariable int userId) {
+        try {
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
+
+            String qrData = String.format("GUEST|%s|%s|%s",
+                user.getName(),
+                user.getVillage() != null ? user.getVillage() : "",
+                user.getPhoneNumber());
+
+            byte[] qrImage = qrCodeService.generateQRCodeImage(qrData);
+
+            return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .header("Content-Disposition", "inline; filename=guest_qr_" + userId + ".png")
+                .header("Cache-Control", "public, max-age=3600")
+                .body(qrImage);
+        } catch (Exception e) {
+            log.error("Error generating guest QR for userId {}: {}", userId, e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // ========== NEW ENDPOINTS FOR UPI COLLECT FLOW ==========
+
+    /**
+     * Upload QR code image and decode it to get event details
+     * POST /whatsapp/scan-qr-image
+     *
+     * @param image The QR code image file
+     * @return Event details including host's UPI ID
+     */
+    @PostMapping(value = "/scan-qr-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<WhatsAppEventDetails> scanQRCodeImage(@RequestParam("image") MultipartFile image) {
+        log.info("Scanning QR code from uploaded image: {}", image.getOriginalFilename());
+
+        try {
+            // Read image from multipart file
+            BufferedImage bufferedImage = ImageIO.read(image.getInputStream());
+            if (bufferedImage == null) {
+                throw new QRCodeException("Could not read the uploaded image");
+            }
+
+            // Decode QR code from image
+            String qrCodeData = qrCodeService.decodeQRCode(bufferedImage);
+            log.info("Decoded QR code: {}", qrCodeData);
+
+            // Find event by QR code
+            Event event = eventService.findByQrCode(qrCodeData);
+
+            WhatsAppEventDetails details = new WhatsAppEventDetails(
+                event.getEventId(),
+                event.getEventName(),
+                event.getEventDate().toString(),
+                event.getHost().getName(),
+                event.getHostUpiId(),
+                event.getThankYouMessage()
+            );
+
+            return ResponseEntity.ok(details);
+
+        } catch (EventNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error decoding QR code from image: {}", e.getMessage(), e);
+            throw new QRCodeException("Failed to decode QR code from image: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Initiate UPI collect payment request
+     * Guest provides their UPI ID, amount, and other details
+     * Backend creates a simulated UPI collect request
+     *
+     * POST /whatsapp/upi-payment
+     */
+    @PostMapping("/upi-payment")
+    public ResponseEntity<UpiCollectResponse> initiateUpiPayment(@Valid @RequestBody GuestUpiPaymentRequest request) {
+        log.info("Initiating UPI payment: eventQR={}, guest={}, guestUpi={}, amount={}",
+                request.eventQrCode(), request.guestPhoneNumber(), request.guestUpiId(), request.amount());
+
+        try {
+            // Find event by QR code
+            Event event = eventService.findByQrCode(request.eventQrCode());
+            String hostUpiId = event.getHostUpiId();
+
+            if (hostUpiId == null || hostUpiId.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    UpiCollectResponse.error("Host has not configured UPI ID for this event")
+                );
+            }
+
+            // Get or create guest user
+            User guest;
+            try {
+                guest = userService.findByPhoneNumber(request.guestPhoneNumber());
+                // Update name and village if provided
+                if (request.guestName() != null && !request.guestName().isEmpty()) {
+                    guest.setName(request.guestName());
+                }
+                if (request.guestVillage() != null && !request.guestVillage().isEmpty()) {
+                    guest.setVillage(request.guestVillage());
+                }
+                userRepository.save(guest);
+            } catch (UserNotFoundException e) {
+                // Create new guest user
+                UserCreateRequest userRequest = new UserCreateRequest(
+                    request.guestName(),
+                    request.guestVillage(),
+                    request.guestPhoneNumber(),
+                    UserRole.GUEST
+                );
+                guest = userService.createUser(userRequest);
+            }
+
+            // Create payment record (Hisab) with PENDING status
+            HisabCreateRequest hisabRequest = new HisabCreateRequest(
+                event.getEventId(),
+                guest.getId(),
+                request.amount(),
+                PaymentMethod.UPI_COLLECT
+            );
+            Hisab hisab = hisabService.createHisab(hisabRequest);
+
+            // Initiate UPI collect request (simulated)
+            UpiCollectRequest collectRequest = upiCollectService.initiateCollect(
+                hisab.getHisabId(),
+                hostUpiId,
+                request.guestUpiId(),
+                request.amount()
+            );
+
+            // Return response
+            return ResponseEntity.ok(UpiCollectResponse.success(
+                hisab.getHisabId(),
+                collectRequest.getCollectRequestId(),
+                hostUpiId,
+                request.guestUpiId(),
+                request.amount()
+            ));
+
+        } catch (EventNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error initiating UPI payment: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(
+                UpiCollectResponse.error("Failed to initiate payment: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * Get payment status
+     * GET /whatsapp/payment-status/{hisabId}
+     */
+    @GetMapping("/payment-status/{hisabId}")
+    public ResponseEntity<?> getPaymentStatus(@PathVariable int hisabId) {
+        log.info("Checking payment status: hisabId={}", hisabId);
+
+        UpiCollectStatus status = upiCollectService.getStatus(hisabId);
+        if (status == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(java.util.Map.of(
+            "hisabId", hisabId,
+            "status", status.toString()
+        ));
+    }
+
+    /**
+     * Simulate payment completion (for testing)
+     * In production, this would be replaced by payment gateway webhook
+     *
+     * POST /whatsapp/simulate-payment/{hisabId}
+     */
+    @PostMapping("/simulate-payment/{hisabId}")
+    public ResponseEntity<?> simulatePayment(@PathVariable int hisabId) {
+        log.info("Simulating payment completion: hisabId={}", hisabId);
+
+        // Check if collect request exists
+        var collectRequest = upiCollectService.getCollectRequest(hisabId);
+        if (collectRequest.isEmpty()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", "No pending payment found for hisabId: " + hisabId
+            ));
+        }
+
+        // Simulate payment success
+        boolean success = upiCollectService.simulatePaymentSuccess(hisabId);
+        if (!success) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", "Could not process payment - may be expired or already processed"
+            ));
+        }
+
+        // Mark hisab as success and send thank you message
+        String transactionId = collectRequest.get().getCollectRequestId();
+        Hisab hisab = hisabService.markPaymentSuccessWithThankYou(hisabId, transactionId, "UPI_COLLECT");
+
+        return ResponseEntity.ok(java.util.Map.of(
+            "hisabId", hisab.getHisabId(),
+            "status", "SUCCESS",
+            "transactionId", transactionId,
+            "message", "Payment completed and thank you message sent to guest"
+        ));
     }
 }
 
