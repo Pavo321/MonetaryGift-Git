@@ -11,6 +11,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 
 @Entity
@@ -40,7 +44,36 @@ public class Event {
     
     @Enumerated(EnumType.STRING)
     private EventStatus status = EventStatus.ACTIVE;
-    
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_type")
+    private EventType eventType = EventType.GIFT_COLLECTION;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confirmation_type")
+    private ConfirmationType confirmationType;
+
+    @Column(name = "capacity")
+    private Integer capacity;
+
+    @Column(name = "price_per_person")
+    private Long pricePerPerson;
+
+    @Column(name = "location")
+    private String location;
+
+    @Column(name = "category")
+    private String category;
+
+    @Column(name = "event_time")
+    private LocalTime eventTime;
+
+    @Column(name = "total_distance_km")
+    private Float totalDistanceKm;
+
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+    private List<EventRouteStop> routeStops = new ArrayList<>();
+
     @CreatedDate
     private LocalDateTime createdAt;
 
@@ -141,6 +174,94 @@ public class Event {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public boolean isCapacityBased() {
+        return eventType == EventType.CAPACITY_EVENT;
+    }
+
+    public EventType getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(EventType eventType) {
+        this.eventType = eventType;
+    }
+
+    public ConfirmationType getConfirmationType() {
+        return confirmationType;
+    }
+
+    public void setConfirmationType(ConfirmationType confirmationType) {
+        this.confirmationType = confirmationType;
+    }
+
+    public Integer getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(Integer capacity) {
+        this.capacity = capacity;
+    }
+
+    public Long getPricePerPerson() {
+        return pricePerPerson;
+    }
+
+    public void setPricePerPerson(Long pricePerPerson) {
+        this.pricePerPerson = pricePerPerson;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public LocalTime getEventTime() {
+        return eventTime;
+    }
+
+    public void setEventTime(LocalTime eventTime) {
+        this.eventTime = eventTime;
+    }
+
+    public Float getTotalDistanceKm() {
+        return totalDistanceKm;
+    }
+
+    public void setTotalDistanceKm(Float totalDistanceKm) {
+        this.totalDistanceKm = totalDistanceKm;
+    }
+
+    public List<EventRouteStop> getRouteStops() {
+        return routeStops;
+    }
+
+    public void setRouteStops(List<EventRouteStop> routeStops) {
+        this.routeStops = routeStops;
+    }
+
+    public boolean isRouteBased() {
+        return routeStops != null && routeStops.size() >= 2;
+    }
+
+    public List<String> getOrderedStopNames() {
+        if (routeStops == null) return List.of();
+        return routeStops.stream()
+            .sorted(Comparator.comparingInt(EventRouteStop::getStopOrder))
+            .map(EventRouteStop::getStopName)
+            .toList();
     }
 
     public String generateQrCodeData() {

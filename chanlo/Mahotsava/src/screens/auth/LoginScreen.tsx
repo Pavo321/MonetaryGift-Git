@@ -15,7 +15,7 @@ import {colors, spacing, borderRadius, fontSize, gradients, shadows} from '../..
 import {IconButton} from '../../components';
 import {api} from '../../services/api';
 
-type LoginMode = 'host' | 'helper';
+type LoginMode = 'host' | 'helper' | 'guest';
 
 export default function LoginScreen({navigation}: any) {
   const [mode, setMode] = useState<LoginMode>('host');
@@ -64,18 +64,27 @@ export default function LoginScreen({navigation}: any) {
 
         <Animated.View entering={FadeInUp.duration(600).delay(200)} style={styles.card}>
           {/* Mode selector */}
-          <View style={styles.modeRow}>
+          <View style={styles.modeGrid}>
+            <View style={styles.modeRow}>
+              <ModeButton
+                icon="home-outline"
+                label="I'm a Host"
+                active={mode === 'host'}
+                onPress={() => setMode('host')}
+              />
+              <ModeButton
+                icon="people-outline"
+                label="Help a Host"
+                active={mode === 'helper'}
+                onPress={() => setMode('helper')}
+              />
+            </View>
             <ModeButton
-              icon="home-outline"
-              label="I'm a Host"
-              active={mode === 'host'}
-              onPress={() => setMode('host')}
-            />
-            <ModeButton
-              icon="people-outline"
-              label="Help a Host"
-              active={mode === 'helper'}
-              onPress={() => setMode('helper')}
+              icon="ticket-outline"
+              label="Join an Event"
+              active={mode === 'guest'}
+              onPress={() => setMode('guest')}
+              fullWidth
             />
           </View>
 
@@ -107,16 +116,18 @@ export default function LoginScreen({navigation}: any) {
         </Animated.View>
 
         <Animated.Text entering={FadeInUp.duration(600).delay(400)} style={styles.footer}>
-          Hosts & Helpers login here.{'\n'}Guests use WhatsApp!
+          {mode === 'guest'
+            ? 'Browse & join events near you'
+            : 'Hosts & Helpers manage events here'}
         </Animated.Text>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
 
-function ModeButton({icon, label, active, onPress}: {icon: string; label: string; active: boolean; onPress: () => void}) {
+function ModeButton({icon, label, active, onPress, fullWidth}: {icon: string; label: string; active: boolean; onPress: () => void; fullWidth?: boolean}) {
   return (
-    <View style={[styles.modeBtn, active && styles.modeBtnActive]}>
+    <View style={[styles.modeBtn, active && styles.modeBtnActive, fullWidth && styles.modeBtnFull]}>
       <Ionicons
         name={icon}
         size={16}
@@ -165,12 +176,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     ...shadows.lg,
   },
+  modeGrid: {
+    marginBottom: spacing.lg,
+    gap: 6,
+  },
   modeRow: {
     flexDirection: 'row',
     backgroundColor: colors.divider,
     borderRadius: borderRadius.full,
     padding: 3,
-    marginBottom: spacing.lg,
   },
   modeBtn: {
     flex: 1,
@@ -179,6 +193,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: borderRadius.full,
+  },
+  modeBtnFull: {
+    flex: 0,
+    width: '100%',
+    backgroundColor: colors.divider,
+    padding: spacing.sm + 2,
   },
   modeBtnActive: {
     backgroundColor: colors.primary,

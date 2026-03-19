@@ -56,18 +56,15 @@ export default function OtpScreen({route, navigation}: any) {
       const res = await api.verifyOtp(phone, code);
       if (res.success) {
         if (res.user) {
-          // Route based on mode selected at login, not DB role.
-          // A user can be a HOST for their own events and a helper for someone else's.
-          if (mode === 'helper') {
-            navigation.reset({
-              index: 0,
-              routes: [{name: 'HelperTabs'}],
-            });
+          // For existing users: trust the mode they selected at login.
+          // A HOST can also be a HELPER for someone else's event.
+          // A GUEST goes to GuestTabs.
+          if (mode === 'guest') {
+            navigation.reset({index: 0, routes: [{name: 'GuestTabs'}]});
+          } else if (mode === 'helper') {
+            navigation.reset({index: 0, routes: [{name: 'HelperTabs'}]});
           } else {
-            navigation.reset({
-              index: 0,
-              routes: [{name: 'HostTabs'}],
-            });
+            navigation.reset({index: 0, routes: [{name: 'HostTabs'}]});
           }
         } else {
           navigation.replace('Register', {mode, eventId});

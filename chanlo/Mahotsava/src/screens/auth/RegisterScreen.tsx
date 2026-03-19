@@ -67,16 +67,19 @@ export default function RegisterScreen({route, navigation}: any) {
 
     setLoading(true);
     try {
+      const role = mode === 'guest' ? 'GUEST' : 'HOST';
       const res = await api.register(
         name.trim(),
         place.trim(),
         email.trim() || undefined,
         pincode.trim() || undefined,
+        role,
       );
       if (res.success) {
+        const destination = mode === 'guest' ? 'GuestTabs' : mode === 'helper' ? 'HelperTabs' : 'HostTabs';
         navigation.reset({
           index: 0,
-          routes: [{name: 'HostTabs'}],
+          routes: [{name: destination}],
         });
       } else {
         Alert.alert('Error', res.message || 'Registration failed');

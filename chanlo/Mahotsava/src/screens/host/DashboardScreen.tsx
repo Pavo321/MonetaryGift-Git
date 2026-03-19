@@ -60,10 +60,18 @@ export default function DashboardScreen({navigation}: any) {
               <Text style={styles.eventDate}>{item.eventDate}</Text>
             </View>
           </View>
-          <View style={[styles.badge, item.status === 'ACTIVE' ? styles.badgeActive : styles.badgeDone]}>
-            <Text style={[styles.badgeText, item.status !== 'ACTIVE' && {color: colors.textMuted}]}>
-              {item.status}
-            </Text>
+          <View style={{alignItems: 'flex-end', gap: 4}}>
+            {item.eventType === 'CAPACITY_EVENT' && (
+              <View style={styles.typeBadge}>
+                <Ionicons name="people-outline" size={10} color={colors.info} />
+                <Text style={styles.typeBadgeText}>CAPACITY</Text>
+              </View>
+            )}
+            <View style={[styles.badge, item.status === 'ACTIVE' ? styles.badgeActive : item.status === 'CONFIRMED' ? styles.badgeConfirmed : styles.badgeDone]}>
+              <Text style={[styles.badgeText, item.status !== 'ACTIVE' && item.status !== 'CONFIRMED' && {color: colors.textMuted}]}>
+                {item.status}
+              </Text>
+            </View>
           </View>
         </View>
         <View style={styles.eventStats}>
@@ -73,11 +81,19 @@ export default function DashboardScreen({navigation}: any) {
             <Text style={styles.statLabel}>Collected</Text>
           </View>
           <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Ionicons name="gift-outline" size={16} color={colors.primary} />
-            <Text style={styles.statValue}>{item.totalGiftsReceived || 0}</Text>
-            <Text style={styles.statLabel}>Contributions</Text>
-          </View>
+          {item.eventType === 'CAPACITY_EVENT' ? (
+            <View style={styles.stat}>
+              <Ionicons name="people-outline" size={16} color={colors.primary} />
+              <Text style={styles.statValue}>{item.activeParticipants || 0}/{item.capacity || 0}</Text>
+              <Text style={styles.statLabel}>Seats</Text>
+            </View>
+          ) : (
+            <View style={styles.stat}>
+              <Ionicons name="gift-outline" size={16} color={colors.primary} />
+              <Text style={styles.statValue}>{item.totalGiftsReceived || 0}</Text>
+              <Text style={styles.statLabel}>Contributions</Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </AnimatedCard>
@@ -224,7 +240,10 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
   badgeActive: {backgroundColor: colors.successLight},
+  badgeConfirmed: {backgroundColor: colors.primaryLight ?? '#E3F2FD'},
   badgeDone: {backgroundColor: colors.divider},
+  typeBadge: {flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.infoLight ?? '#E3F2FD', paddingHorizontal: 6, paddingVertical: 2, borderRadius: borderRadius.full ?? 20},
+  typeBadgeText: {fontSize: 9, fontWeight: '700', color: colors.info},
   badgeText: {
     fontSize: 10,
     fontWeight: '700',

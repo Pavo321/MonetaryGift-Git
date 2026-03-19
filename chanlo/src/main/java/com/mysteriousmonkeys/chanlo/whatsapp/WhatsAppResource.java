@@ -107,7 +107,8 @@ public class WhatsAppResource {
             request.eventDate(),
             host.getId(),
             request.hostUpiId(),
-            request.thankYouMessage()
+            request.thankYouMessage(),
+            null, null, null, null, null, "OTHER", null, null, null
         );
         
         Event event = eventService.createEvent(eventRequest);
@@ -279,7 +280,8 @@ public class WhatsAppResource {
             event.setQrCodeData(qrCodeData);
             // Save the updated QR code
             eventService.updateEvent(eventId, new EventCreateRequest(
-                event.getEventName(), event.getEventDate(), event.getHost().getId(), event.getHostUpiId(), event.getThankYouMessage()));
+                event.getEventName(), event.getEventDate(), event.getHost().getId(), event.getHostUpiId(), event.getThankYouMessage(),
+                null, null, null, null, null, event.getCategory() != null ? event.getCategory() : "OTHER", null, null, null));
         }
         
         return ResponseEntity.ok(qrCodeData);

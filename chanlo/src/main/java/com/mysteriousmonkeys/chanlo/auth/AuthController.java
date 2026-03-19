@@ -1,6 +1,7 @@
 package com.mysteriousmonkeys.chanlo.auth;
 
 import com.mysteriousmonkeys.chanlo.user.User;
+import com.mysteriousmonkeys.chanlo.user.UserRole;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -76,12 +77,15 @@ public class AuthController {
         }
 
         try {
+            String roleStr = request.getOrDefault("role", "HOST");
+            UserRole role = "GUEST".equalsIgnoreCase(roleStr) ? UserRole.GUEST : UserRole.HOST;
             User user = authService.registerUser(
                 token,
                 request.get("name"),
                 request.get("place"),
                 request.getOrDefault("email", null),
-                request.getOrDefault("pincode", null)
+                request.getOrDefault("pincode", null),
+                role
             );
             return ResponseEntity.ok(Map.of(
                 "success", true,

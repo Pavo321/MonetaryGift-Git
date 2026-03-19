@@ -1,6 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://009d-2402-a00-10a-78ce-a0ac-2e70-665d-c1e5.ngrok-free.app';
+export type RouteStopInput = {
+  name: string;
+  lat: number;
+  lng: number;
+  distanceToNextKm: number | null;
+};
+
+export type RouteStopResponse = {
+  stopOrder: number;
+  name: string;
+  lat: number;
+  lng: number;
+  distanceToNextKm: number | null;
+};
+
+const BASE_URL = 'https://5989-2402-a00-10a-78ce-1401-55b5-d1b1-c29.ngrok-free.app';
 
 const TOKEN_KEY = '@mahotsava_token';
 const USER_KEY = '@mahotsava_user';
@@ -42,8 +57,7 @@ class ApiService {
   private async request(path: string, options: RequestInit = {}) {
     const headers: any = {
       'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-      ...options.headers,
+...options.headers,
     };
 
     if (this.token) {
@@ -90,10 +104,10 @@ class ApiService {
     return data;
   }
 
-  async register(name: string, place: string, email?: string, pincode?: string) {
+  async register(name: string, place: string, email?: string, pincode?: string, role?: string) {
     const data = await this.request('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({name, place, email, pincode}),
+      body: JSON.stringify({name, place, email, pincode, role}),
     });
     if (data.success && data.user) {
       await this.setUser(data.user);
@@ -111,10 +125,23 @@ class ApiService {
   }
 
   // Events
-  async createEvent(eventName: string, eventDate: string, hostMessage?: string) {
+  async createEvent(
+    eventName: string,
+    eventDate: string,
+    hostMessage?: string,
+    eventType?: string,
+    confirmationType?: string,
+    capacity?: number,
+    pricePerPerson?: number,
+    location?: string,
+    category?: string,
+    eventTime?: string,
+    routeStops?: RouteStopInput[],
+    totalDistanceKm?: number,
+  ) {
     return this.request('/api/app/events', {
       method: 'POST',
-      body: JSON.stringify({eventName, eventDate, hostMessage}),
+      body: JSON.stringify({eventName, eventDate, hostMessage, eventType, confirmationType, capacity, pricePerPerson, location, category, eventTime, routeStops, totalDistanceKm}),
     });
   }
 
@@ -222,6 +249,60 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  // Capacity Events — Host actions
+  async confirmEvent(eventId: number) {
+    return this.request(`/api/app/events/${eventId}/confirm`, {method: 'POST'});
+  }
+
+  async cancelEvent(eventId: number) {
+    return this.request(`/api/app/events/${eventId}/cancel`, {method: 'DELETE'});
+  }
+
+  async getParticipants(eventId: number) {
+    return this.request(`/api/app/events/${eventId}/participants`);
+  }
+
+  // Capacity Events — Guest actions
+  async joinEvent(eventId: number, fromStopOrder?: number, toStopOrder?: number, seatsBooked: number = 1) {
+    return this.request(`/api/app/events/${eventId}/join`, {
+      method: 'POST',
+      body: JSON.stringify({fromStopOrder, toStopOrder, seatsBooked}),
+    });
+  }
+
+  async getRouteAvailability(eventId: number, from: number, to: number) {
+    return this.request(`/api/app/events/${eventId}/route-availability?from=${from}&to=${to}`);
+  }
+
+  async findNearestStop(eventId: number, lat: number, lng: number) {
+    return this.request(`/api/app/events/${eventId}/find-stop?lat=${lat}&lng=${lng}`);
+  }
+
+  async confirmJoinPayment(hisabId: number, transactionId: string) {
+    return this.request(`/api/app/hisab/${hisabId}/confirm-payment`, {
+      method: 'POST',
+      body: JSON.stringify({transactionId}),
+    });
+  }
+
+  async exitEvent(hisabId: number) {
+    return this.request(`/api/app/hisab/${hisabId}/exit`, {method: 'POST'});
+  }
+
+  async getMyJoinedEvents() {
+    return this.request('/api/app/guest/events');
+  }
+
+  // Browse Events (Guest discovery)
+  async browseEvents(name?: string, location?: string, category?: string) {
+    const params = new URLSearchParams();
+    if (name)     params.append('name', name);
+    if (location) params.append('location', location);
+    if (category && category !== 'ALL') params.append('category', category);
+    const qs = params.toString();
+    return this.request(`/api/app/events/browse${qs ? '?' + qs : ''}`);
   }
 }
 
