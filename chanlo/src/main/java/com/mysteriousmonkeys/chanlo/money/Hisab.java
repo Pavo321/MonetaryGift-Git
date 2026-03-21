@@ -29,7 +29,7 @@ public class Hisab {
     @JoinColumn(name = "collected_by", referencedColumnName = "id")
     private User collectedBy;
 
-    private Long amount;
+    private Double amount;
 
     private String verificationQrData;
     
@@ -50,7 +50,7 @@ public class Hisab {
     public Hisab() {
     }
 
-    public Hisab(int id, Event event, User guest, Long amount) {
+    public Hisab(int id, Event event, User guest, Double amount) {
         this.hisabId = id;
         this.event = event;
         this.guest = guest;
@@ -81,11 +81,11 @@ public class Hisab {
         this.guest = guest;
     }
 
-    public Long getAmount() {
+    public Double getAmount() {
         return amount;
     }
 
-    public void setAmount(Long amount) {
+    public void setAmount(Double amount) {
         this.amount = amount;
     }
 
