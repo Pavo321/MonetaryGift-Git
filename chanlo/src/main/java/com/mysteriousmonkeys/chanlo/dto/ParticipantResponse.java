@@ -9,7 +9,7 @@ public record ParticipantResponse(
     int guestId,
     String guestName,
     String guestPhone,
-    Long amount,
+    Double amount,
     PaymentStatus status,
     LocalDateTime joinedAt,
     String fromStop,

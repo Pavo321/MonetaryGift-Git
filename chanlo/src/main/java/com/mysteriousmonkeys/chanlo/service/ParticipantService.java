@@ -129,7 +129,7 @@ public class ParticipantService {
         }
 
         // For route-based TRAVEL events: price is proportional to segment distance vs total route distance
-        long totalAmount;
+        double totalAmount;
         if (event.isRouteBased() && fromStopOrder != null && toStopOrder != null
                 && event.getTotalDistanceKm() != null && event.getTotalDistanceKm() > 0) {
             List<EventRouteStop> orderedStops = event.getRouteStops().stream()
@@ -144,14 +144,14 @@ public class ParticipantService {
             totalAmount = Math.round(pricePerKm * segmentKm * seatsBooked);
             if (totalAmount < 1) totalAmount = 1;
         } else {
-            totalAmount = event.getPricePerPerson() * seatsBooked;
+            totalAmount = (double) event.getPricePerPerson() * seatsBooked;
         }
 
         // Create PENDING Hisab
         Hisab hisab = new Hisab();
         hisab.setEvent(event);
         hisab.setGuest(guest);
-        hisab.setAmount(totalAmount);
+        hisab.setAmount((double) totalAmount);
         hisab.setPaymentMethod(PaymentMethod.UPI_DEEP_LINK);
         hisab.setPaymentStatus(PaymentStatus.PENDING);
         hisab.setSeatsBooked(seatsBooked);
