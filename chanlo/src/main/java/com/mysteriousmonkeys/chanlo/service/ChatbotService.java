@@ -139,56 +139,12 @@ public class ChatbotService {
             states.put(phone, state);
         }
         state.step = Step.WAITING_MAIN_CHOICE;
+        state.managedUsers = null;
+        state.pendingAction = null;
 
         String body = (prefix != null ? prefix + "\n\n" : "")
             + "Namaste " + name + "!\n\nWhat would you like to do?";
 
-        try {
-            User self = userService.findByPhoneNumber(phone);
-            List<User> managed = userRepository.findByManagedBy(self);
-
-            if (!managed.isEmpty()) {
-                // Pre-load persons list into state so handleMainChoice can resolve by index
-                state.managedUsers = new java.util.ArrayList<>();
-                state.managedUsers.add(self);
-                state.managedUsers.addAll(managed);
-
-                // Build rows for each person
-                java.util.function.Function<String, List<Map<String, Object>>> personRows = prefix2 -> {
-                    List<Map<String, Object>> rows = new java.util.ArrayList<>();
-                    rows.add(java.util.Map.of("id", prefix2 + "_0", "title", self.getName() + " (You)"));
-                    for (int i = 0; i < managed.size(); i++) {
-                        rows.add(java.util.Map.of("id", prefix2 + "_" + (i + 1), "title", managed.get(i).getName()));
-                    }
-                    return rows;
-                };
-
-                // Section helper
-                java.util.function.BiFunction<String, String, Map<String, Object>> section = (title, prefix2) -> {
-                    Map<String, Object> s = new HashMap<>();
-                    s.put("title", title);
-                    s.put("rows", personRows.apply(prefix2));
-                    return s;
-                };
-
-                // Other section
-                Map<String, Object> otherSection = new HashMap<>();
-                otherSection.put("title", "Other");
-                otherSection.put("rows", List.of(Map.of("id", "ADD_PERSON", "title", "Add a person")));
-
-                whatsAppApiService.sendListMessageSections(phone, body, "Menu", List.of(
-                    section.apply("Get your QR", "QR"),
-                    section.apply("Edit details", "EDIT"),
-                    section.apply("Transaction history", "HIST"),
-                    otherSection
-                ));
-                return "";
-            }
-        } catch (Exception e) {
-            log.debug("Could not load managed users for menu: {}", e.getMessage());
-        }
-
-        // Simple menu — no managed users
         whatsAppApiService.sendListMessage(phone, body, "Menu", "Options", List.of(
             Map.of("id", "MENU_1", "title", "Edit your details"),
             Map.of("id", "MENU_2", "title", "Get your QR"),
@@ -196,6 +152,43 @@ public class ChatbotService {
             Map.of("id", "MENU_4", "title", "Add a person")
         ));
         return "";
+    }
+
+    /**
+     * Show a person picker list after user selects an action.
+     * Sends a list of self + managed persons with PICK_N row IDs.
+     */
+    private void showPersonPicker(String phone, ConversationState state, String action) {
+        try {
+            User self = userService.findByPhoneNumber(phone);
+            List<User> managed = userRepository.findByManagedBy(self);
+
+            state.managedUsers = new java.util.ArrayList<>();
+            state.managedUsers.add(self);
+            state.managedUsers.addAll(managed);
+            state.pendingAction = action;
+            state.step = Step.PICK_USER;
+
+            String actionLabel = switch (action) {
+                case "QR" -> "get QR for";
+                case "EDIT" -> "edit details of";
+                case "HIST" -> "view history of";
+                default -> "select";
+            };
+
+            List<Map<String, String>> rows = new java.util.ArrayList<>();
+            rows.add(Map.of("id", "PICK_0", "title", self.getName() + " (You)"));
+            for (int i = 0; i < managed.size(); i++) {
+                rows.add(Map.of("id", "PICK_" + (i + 1), "title", managed.get(i).getName()));
+            }
+
+            whatsAppApiService.sendListMessage(phone,
+                "Who would you like to " + actionLabel + "?",
+                "Select", "People", rows);
+
+        } catch (Exception e) {
+            log.error("Error showing person picker: {}", e.getMessage());
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -210,6 +203,8 @@ public class ChatbotService {
 
             // Main menu
             case WAITING_MAIN_CHOICE -> handleMainChoice(phone, msg, state);
+            // Person picker
+            case PICK_USER -> handlePickUser(phone, msg, state);
 
             // Edit details
             case EDIT_NAME -> handleEditName(phone, msg, state);
@@ -274,54 +269,82 @@ public class ChatbotService {
     // ═══════════════════════════════════════════════════════════════════════════
 
     private String handleMainChoice(String phone, String msg, ConversationState state) {
-        // Combined action+person IDs from multi-section menu: QR_0, EDIT_1, HIST_2, ADD_PERSON
-        if (msg.startsWith("QR_") || msg.startsWith("EDIT_") || msg.startsWith("HIST_")) {
-            return handleCombinedActionId(phone, msg, state);
-        }
         if ("ADD_PERSON".equals(msg)) {
             state.step = Step.ADD_PERSON_NAME;
             return "Add a family member or person without WhatsApp.\n\nEnter their name:";
         }
 
-        // Simple menu IDs (no managed users): MENU_1…MENU_4 or plain numbers
+        // MENU_1…MENU_4 or plain numbers
         String choice = msg.startsWith("MENU_") ? msg.substring(5) : msg;
         return switch (choice) {
-            case "1" -> { state.step = Step.EDIT_NAME; yield "What's your new name?\n(Type 'skip' to keep current)"; }
-            case "2" -> handleGetQr(phone, state);
-            case "3" -> handleTransactionHistory(phone, state);
+            case "1" -> handleActionOrPick(phone, state, "EDIT");
+            case "2" -> handleActionOrPick(phone, state, "QR");
+            case "3" -> handleActionOrPick(phone, state, "HIST");
             case "4" -> { state.step = Step.ADD_PERSON_NAME; yield "Add a family member or person without WhatsApp.\n\nEnter their name:"; }
             default -> showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
         };
     }
 
-    /** Parse QR_0 / EDIT_1 / HIST_2 → activate person by index, then run action. */
-    private String handleCombinedActionId(String phone, String msg, ConversationState state) {
+    /**
+     * If user has managed persons → show person picker list in same chat.
+     * Otherwise → execute action directly for self.
+     */
+    private String handleActionOrPick(String phone, ConversationState state, String action) {
         try {
-            int underscore = msg.lastIndexOf('_');
-            String action = msg.substring(0, underscore);  // "QR", "EDIT", "HIST"
-            int index = Integer.parseInt(msg.substring(underscore + 1));
+            User self = userService.findByPhoneNumber(phone);
+            List<User> managed = userRepository.findByManagedBy(self);
 
-            // Resolve person from pre-loaded list in state (populated in showMainMenu)
-            if (state.managedUsers != null && index >= 0 && index < state.managedUsers.size()) {
-                User selected = state.managedUsers.get(index);
-                state.activeUserId = selected.getId();
-                state.activeUserName = selected.getName();
+            if (!managed.isEmpty()) {
+                showPersonPicker(phone, state, action);
+                return "";
             }
-            // If managedUsers not available (edge case), stay with current active user
-
-            return switch (action) {
-                case "QR" -> handleGetQr(phone, state);
-                case "HIST" -> handleTransactionHistory(phone, state);
-                case "EDIT" -> {
-                    state.step = Step.EDIT_NAME;
-                    yield "Editing details for: " + state.activeUserName + "\n\nWhat's the new name?\n(Type 'skip' to keep current)";
-                }
-                default -> showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
-            };
         } catch (Exception e) {
-            log.error("Error handling combined action id {}: {}", msg, e.getMessage());
-            return showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
+            log.debug("Could not check managed users: {}", e.getMessage());
         }
+
+        // No managed persons — run action directly for self
+        return executeAction(phone, state, action);
+    }
+
+    /** Handle PICK_N response from person picker. */
+    private String handlePickUser(String phone, String msg, ConversationState state) {
+        if (!msg.startsWith("PICK_")) {
+            return "Please select from the list.";
+        }
+        int index;
+        try {
+            index = Integer.parseInt(msg.substring(5));
+        } catch (NumberFormatException e) {
+            return "Please select from the list.";
+        }
+
+        if (state.managedUsers == null || index < 0 || index >= state.managedUsers.size()) {
+            showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
+            return "";
+        }
+
+        User selected = state.managedUsers.get(index);
+        state.activeUserId = selected.getId();
+        state.activeUserName = selected.getName();
+        state.managedUsers = null;
+
+        String action = state.pendingAction != null ? state.pendingAction : "QR";
+        state.pendingAction = null;
+
+        return executeAction(phone, state, action);
+    }
+
+    /** Execute QR / EDIT / HIST for the current active user. */
+    private String executeAction(String phone, ConversationState state, String action) {
+        return switch (action) {
+            case "QR" -> handleGetQr(phone, state);
+            case "HIST" -> handleTransactionHistory(phone, state);
+            case "EDIT" -> {
+                state.step = Step.EDIT_NAME;
+                yield "Editing details for: " + state.activeUserName + "\n\nWhat's the new name?\n(Type 'skip' to keep current)";
+            }
+            default -> showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
+        };
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -870,8 +893,9 @@ public class ChatbotService {
         double amount;
         String pendingEventCode;
 
-        // Person list (pre-loaded in showMainMenu for combined action IDs)
+        // Person list + pending action for two-step person picker
         List<User> managedUsers;
+        String pendingAction;
     }
 
     private enum Step {
@@ -879,6 +903,8 @@ public class ChatbotService {
         REG_NAME, REG_PLACE,
         // Main menu
         WAITING_MAIN_CHOICE,
+        // Person picker (after action selected)
+        PICK_USER,
         // Edit
         EDIT_NAME, EDIT_PLACE,
         // Add person
