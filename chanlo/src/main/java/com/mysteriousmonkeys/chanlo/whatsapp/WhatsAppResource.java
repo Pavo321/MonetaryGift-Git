@@ -142,9 +142,9 @@ public class WhatsAppResource {
         List<WhatsAppPaymentSummary> payments = hisabService.getPaymentsForEvent(eventId);
         
         // Calculate totals
-        Long totalAmount = payments.stream()
+        Double totalAmount = payments.stream()
             .filter(p -> "SUCCESS".equals(p.paymentStatus()))
-            .mapToLong(WhatsAppPaymentSummary::amount)
+            .mapToDouble(WhatsAppPaymentSummary::amount)
             .sum();
         
         Long totalGifts = payments.stream()

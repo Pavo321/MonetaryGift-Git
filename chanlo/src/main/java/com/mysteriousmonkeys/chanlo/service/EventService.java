@@ -3,12 +3,14 @@ package com.mysteriousmonkeys.chanlo.service;
 import com.mysteriousmonkeys.chanlo.dto.EventCreateRequest;
 import com.mysteriousmonkeys.chanlo.dto.EventResponse;
 import com.mysteriousmonkeys.chanlo.event.Event;
+import com.mysteriousmonkeys.chanlo.event.EventHelperRepository;
 import com.mysteriousmonkeys.chanlo.event.EventRepository;
 import com.mysteriousmonkeys.chanlo.event.EventStatus;
 import com.mysteriousmonkeys.chanlo.exception.EventNotFoundException;
 import com.mysteriousmonkeys.chanlo.exception.UserNotFoundException;
 import com.mysteriousmonkeys.chanlo.money.MoneyRepository;
 import com.mysteriousmonkeys.chanlo.money.PaymentStatus;
+import com.mysteriousmonkeys.chanlo.money.SettlementRepository;
 import com.mysteriousmonkeys.chanlo.user.User;
 import com.mysteriousmonkeys.chanlo.user.UserRepository;
 import jakarta.transaction.Transactional;
@@ -34,6 +36,12 @@ public class EventService {
     
     @Autowired
     private MoneyRepository moneyRepository;
+
+    @Autowired
+    private EventHelperRepository eventHelperRepository;
+
+    @Autowired
+    private SettlementRepository settlementRepository;
     
     @Value("${app.base.url:http://localhost:8080}")
     private String baseUrl;
@@ -97,21 +105,23 @@ public class EventService {
             eventRepository.save(event);
         }
         
-        Long totalAmount = moneyRepository.getTotalAmountByEvent(event);
-        if (totalAmount == null) {
-            totalAmount = 0L;
-        }
+        Double totalAmount = moneyRepository.getTotalAmountByEvent(event);
+        if (totalAmount == null) totalAmount = 0.0;
+        Double cashAmount = moneyRepository.getTotalCashByEvent(event);
+        if (cashAmount == null) cashAmount = 0.0;
+        Double upiAmount = moneyRepository.getTotalUpiByEvent(event);
+        if (upiAmount == null) upiAmount = 0.0;
         Long giftCount = (long) moneyRepository
             .findByEventAndPaymentStatus(event, PaymentStatus.SUCCESS)
             .size();
-        
-        return EventResponse.from(event, totalAmount, giftCount);
+
+        return EventResponse.from(event, totalAmount, giftCount, cashAmount, upiAmount);
     }
     
     public List<Event> getEventsByHost(int hostId) {
         var host = userRepository.findById(hostId)
             .orElseThrow(() -> new UserNotFoundException("Host not found"));
-        return eventRepository.findByHost(host);
+        return eventRepository.findByHostOrderByEventIdDesc(host);
     }
     
     public Event findByQrCode(String qrCodeData) {
@@ -142,6 +152,24 @@ public class EventService {
     }
     
     public void deleteEvent(int eventId) {
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> new EventNotFoundException("Event not found"));
+
+        // Check all helpers are settled before allowing delete
+        var helpers = eventHelperRepository.findByEventAndIsActiveTrue(event);
+        List<String> unsettled = new java.util.ArrayList<>();
+        for (var eh : helpers) {
+            var helper = eh.getHelper();
+            Double cash = moneyRepository.getTotalCashCollectedByHelper(event, helper);
+            Double settled = settlementRepository.getTotalSettledByEventAndHelper(event, helper);
+            if (cash - settled > 0.01) {
+                unsettled.add(helper.getName() + " (Rs. " + String.format("%.2f", cash - settled) + " pending)");
+            }
+        }
+        if (!unsettled.isEmpty()) {
+            throw new RuntimeException("Cannot delete event. Settle with helpers first: " + String.join(", ", unsettled));
+        }
+
         eventRepository.deleteById(eventId);
     }
     
@@ -151,7 +179,7 @@ public class EventService {
     public List<Event> getEventsByHostPhone(String phoneNumber) {
         User host = userRepository.findByPhoneNumber(phoneNumber)
             .orElseThrow(() -> new UserNotFoundException("Host not found with phone: " + phoneNumber));
-        return eventRepository.findByHost(host);
+        return eventRepository.findByHostOrderByEventIdDesc(host);
     }
     
     /**

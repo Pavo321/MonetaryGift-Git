@@ -113,25 +113,59 @@ export default function EventDetailScreen({route, navigation}: any) {
           setQrVisible(true);
         }}
       />
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={() =>
+          Alert.alert(
+            'Delete Event',
+            'This will permanently delete the event and all its data. Make sure all helpers are settled first.',
+            [
+              {text: 'Cancel', style: 'cancel'},
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                  const res = await api.deleteEvent(eventId);
+                  if (res.success) {
+                    navigation.goBack();
+                  } else {
+                    Alert.alert('Cannot Delete', res.message || 'Failed to delete event');
+                  }
+                },
+              },
+            ],
+          )
+        }>
+        <Ionicons name="trash-outline" size={16} color={colors.error} />
+        <Text style={styles.deleteBtnText}>Delete Event</Text>
+      </TouchableOpacity>
 
       {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
-          <Ionicons name="wallet-outline" size={18} color={colors.secondary} />
-          <AmountDisplay amount={event.totalAmount || 0} color={colors.secondary} size="sm" />
-          <Text style={styles.statLabel}>Collected</Text>
+          <Ionicons name="cash-outline" size={16} color={colors.secondary} />
+          <AmountDisplay amount={event.cashAmount || 0} color={colors.secondary} size="sm" />
+          <Text style={styles.statLabel}>Cash</Text>
         </View>
         <View style={styles.statBox}>
-          <Ionicons name="gift-outline" size={18} color={colors.primary} />
+          <Ionicons name="card-outline" size={16} color={colors.info} />
+          <AmountDisplay amount={event.upiAmount || 0} color={colors.info} size="sm" />
+          <Text style={styles.statLabel}>UPI</Text>
+        </View>
+        <View style={styles.statBox}>
+          <Ionicons name="gift-outline" size={16} color={colors.primary} />
           <Text style={styles.statValue}>{event.totalGiftsReceived || 0}</Text>
           <Text style={styles.statLabel}>Gifts</Text>
         </View>
-        <View style={styles.statBox}>
-          <Ionicons name="receipt-outline" size={18} color={colors.info} />
-          <Text style={styles.statValue}>{payments.length}</Text>
-          <Text style={styles.statLabel}>Records</Text>
-        </View>
       </View>
+
+      {/* Accept Gift button */}
+      <TouchableOpacity
+        style={styles.acceptGiftBtn}
+        onPress={() => navigation.navigate('HostCollect', {eventId, eventName: event.eventName})}>
+        <Ionicons name="gift-outline" size={18} color={colors.textLight} />
+        <Text style={styles.acceptGiftText}>Accept Gift</Text>
+      </TouchableOpacity>
 
       {/* Tabs */}
       <View style={styles.tabRow}>
@@ -337,4 +371,27 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   modalCloseBtnText: {color: colors.textLight, fontSize: fontSize.md, fontWeight: '700'},
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginRight: spacing.md,
+    marginTop: -spacing.xs,
+  },
+  deleteBtnText: {fontSize: fontSize.xs, color: colors.error, fontWeight: '600'},
+  acceptGiftBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+  },
+  acceptGiftText: {fontSize: fontSize.md, fontWeight: '700', color: colors.textLight},
 });

@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import {
   View,
   FlatList,
@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import {useFocusEffect} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {colors, spacing, borderRadius, fontSize, shadows} from '../../theme/colors';
@@ -20,6 +21,14 @@ export default function DashboardScreen({navigation}: any) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener(state => {
+      setOffline(!(state.isConnected && state.isInternetReachable));
+    });
+    return unsub;
+  }, []);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -94,6 +103,12 @@ export default function DashboardScreen({navigation}: any) {
   return (
     <View style={styles.container}>
       <GradientHeader title="Mahotsava" subtitle="Your Events" />
+      {offline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={14} color="#fff" />
+          <Text style={styles.offlineText}>Offline — showing cached data</Text>
+        </View>
+      )}
 
       {/* Summary cards */}
       <View style={styles.summaryRow}>
@@ -247,6 +262,15 @@ const styles = StyleSheet.create({
   },
   statDivider: {width: 1, backgroundColor: colors.divider, marginHorizontal: spacing.sm},
   statValue: {fontSize: fontSize.sm, fontWeight: '700', color: colors.textPrimary, marginLeft: 4},
+  offlineBanner: {
+    backgroundColor: '#F57C00',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+  },
+  offlineText: {color: '#fff', fontSize: 12, fontWeight: '600'},
   statLabel: {
     fontSize: fontSize.xs,
     color: colors.textMuted,

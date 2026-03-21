@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -128,6 +129,10 @@ public class ChatbotService {
     }
 
     private String showMainMenu(String phone, String name) {
+        return showMainMenu(phone, name, null);
+    }
+
+    private String showMainMenu(String phone, String name, String prefix) {
         ConversationState state = states.get(phone);
         if (state == null) {
             state = new ConversationState();
@@ -135,19 +140,62 @@ public class ChatbotService {
         }
         state.step = Step.WAITING_MAIN_CHOICE;
 
-        String activeLabel = "";
-        if (state.activeUserName != null && !state.activeUserName.equals(name)) {
-            activeLabel = "\n(Acting as: " + state.activeUserName + ")\n";
+        String body = (prefix != null ? prefix + "\n\n" : "")
+            + "Namaste " + name + "!\n\nWhat would you like to do?";
+
+        try {
+            User self = userService.findByPhoneNumber(phone);
+            List<User> managed = userRepository.findByManagedBy(self);
+
+            if (!managed.isEmpty()) {
+                // Pre-load persons list into state so handleMainChoice can resolve by index
+                state.managedUsers = new java.util.ArrayList<>();
+                state.managedUsers.add(self);
+                state.managedUsers.addAll(managed);
+
+                // Build rows for each person
+                java.util.function.Function<String, List<Map<String, Object>>> personRows = prefix2 -> {
+                    List<Map<String, Object>> rows = new java.util.ArrayList<>();
+                    rows.add(java.util.Map.of("id", prefix2 + "_0", "title", self.getName() + " (You)"));
+                    for (int i = 0; i < managed.size(); i++) {
+                        rows.add(java.util.Map.of("id", prefix2 + "_" + (i + 1), "title", managed.get(i).getName()));
+                    }
+                    return rows;
+                };
+
+                // Section helper
+                java.util.function.BiFunction<String, String, Map<String, Object>> section = (title, prefix2) -> {
+                    Map<String, Object> s = new HashMap<>();
+                    s.put("title", title);
+                    s.put("rows", personRows.apply(prefix2));
+                    return s;
+                };
+
+                // Other section
+                Map<String, Object> otherSection = new HashMap<>();
+                otherSection.put("title", "Other");
+                otherSection.put("rows", List.of(Map.of("id", "ADD_PERSON", "title", "Add a person")));
+
+                whatsAppApiService.sendListMessageSections(phone, body, "Menu", List.of(
+                    section.apply("Get your QR", "QR"),
+                    section.apply("Edit details", "EDIT"),
+                    section.apply("Transaction history", "HIST"),
+                    otherSection
+                ));
+                return "";
+            }
+        } catch (Exception e) {
+            log.debug("Could not load managed users for menu: {}", e.getMessage());
         }
 
-        return "Namaste " + name + "!" + activeLabel + "\n\n" +
-               "What would you like to do?\n\n" +
-               "1. Edit your details\n" +
-               "2. Get your QR\n" +
-               "3. Transaction history\n" +
-               "4. Add a person\n" +
-               "5. Switch user\n\n" +
-               "(Type a number 1-5)";
+        // Simple menu — no managed users
+        whatsAppApiService.sendListMessage(phone, body, "Menu", "Options", List.of(
+            Map.of("id", "MENU_1", "title", "Edit your details"),
+            Map.of("id", "MENU_2", "title", "Get your QR"),
+            Map.of("id", "MENU_3", "title", "Transaction history"),
+            Map.of("id", "MENU_4", "title", "Add a person")
+        ));
+        return "";
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -172,7 +220,7 @@ public class ChatbotService {
             case ADD_PERSON_PLACE -> handleAddPersonPlace(phone, msg, state);
             case ADD_PERSON_PHONE -> handleAddPersonPhone(phone, msg, state);
 
-            // Switch user
+            // Switch user (legacy)
             case SWITCH_USER -> handleSwitchUser(phone, msg, state);
 
             // QR scan event choice
@@ -211,7 +259,8 @@ public class ChatbotService {
 
             log.info("New guest registered: {} from {} ({})", state.tempName, msg, phone);
 
-            return "Registered successfully!\n\n" + showMainMenu(phone, user.getName());
+            showMainMenu(phone, user.getName(), "Registered successfully!");
+            return "";
 
         } catch (Exception e) {
             log.error("Error registering user: {}", e.getMessage(), e);
@@ -225,32 +274,53 @@ public class ChatbotService {
     // ═══════════════════════════════════════════════════════════════════════════
 
     private String handleMainChoice(String phone, String msg, ConversationState state) {
-        switch (msg) {
-            case "1" -> { // Edit details
-                state.step = Step.EDIT_NAME;
-                return "What's your new name?\n(Type 'skip' to keep current)";
+        // Combined action+person IDs from multi-section menu: QR_0, EDIT_1, HIST_2, ADD_PERSON
+        if (msg.startsWith("QR_") || msg.startsWith("EDIT_") || msg.startsWith("HIST_")) {
+            return handleCombinedActionId(phone, msg, state);
+        }
+        if ("ADD_PERSON".equals(msg)) {
+            state.step = Step.ADD_PERSON_NAME;
+            return "Add a family member or person without WhatsApp.\n\nEnter their name:";
+        }
+
+        // Simple menu IDs (no managed users): MENU_1…MENU_4 or plain numbers
+        String choice = msg.startsWith("MENU_") ? msg.substring(5) : msg;
+        return switch (choice) {
+            case "1" -> { state.step = Step.EDIT_NAME; yield "What's your new name?\n(Type 'skip' to keep current)"; }
+            case "2" -> handleGetQr(phone, state);
+            case "3" -> handleTransactionHistory(phone, state);
+            case "4" -> { state.step = Step.ADD_PERSON_NAME; yield "Add a family member or person without WhatsApp.\n\nEnter their name:"; }
+            default -> showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
+        };
+    }
+
+    /** Parse QR_0 / EDIT_1 / HIST_2 → activate person by index, then run action. */
+    private String handleCombinedActionId(String phone, String msg, ConversationState state) {
+        try {
+            int underscore = msg.lastIndexOf('_');
+            String action = msg.substring(0, underscore);  // "QR", "EDIT", "HIST"
+            int index = Integer.parseInt(msg.substring(underscore + 1));
+
+            // Resolve person from pre-loaded list in state (populated in showMainMenu)
+            if (state.managedUsers != null && index >= 0 && index < state.managedUsers.size()) {
+                User selected = state.managedUsers.get(index);
+                state.activeUserId = selected.getId();
+                state.activeUserName = selected.getName();
             }
-            case "2" -> { // Get QR
-                return handleGetQr(phone, state);
-            }
-            case "3" -> { // Transaction history
-                return handleTransactionHistory(phone, state);
-            }
-            case "4" -> { // Add a person
-                state.step = Step.ADD_PERSON_NAME;
-                return "Add a family member or person without WhatsApp.\n\nEnter their name:";
-            }
-            case "5" -> { // Switch user
-                return handleSwitchUserMenu(phone, state);
-            }
-            default -> {
-                return "Please type a number 1-5:\n\n" +
-                       "1. Edit your details\n" +
-                       "2. Get your QR\n" +
-                       "3. Transaction history\n" +
-                       "4. Add a person\n" +
-                       "5. Switch user";
-            }
+            // If managedUsers not available (edge case), stay with current active user
+
+            return switch (action) {
+                case "QR" -> handleGetQr(phone, state);
+                case "HIST" -> handleTransactionHistory(phone, state);
+                case "EDIT" -> {
+                    state.step = Step.EDIT_NAME;
+                    yield "Editing details for: " + state.activeUserName + "\n\nWhat's the new name?\n(Type 'skip' to keep current)";
+                }
+                default -> showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
+            };
+        } catch (Exception e) {
+            log.error("Error handling combined action id {}: {}", msg, e.getMessage());
+            return showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
         }
     }
 
@@ -460,22 +530,22 @@ public class ChatbotService {
                        "Type 'hi' for main menu.";
             }
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("Select a person:\n\n");
-            sb.append("1. ").append(self.getName()).append(" (You)\n");
-            int index = 2;
-            for (User m : managed) {
-                sb.append(index++).append(". ").append(m.getName()).append("\n");
-            }
-            sb.append("\n(Type a number)");
-
-            // Store the list for reference
+            // Store the list for reference (self first, then managed)
             state.managedUsers = new java.util.ArrayList<>();
             state.managedUsers.add(self);
             state.managedUsers.addAll(managed);
             state.step = Step.SWITCH_USER;
 
-            return sb.toString();
+            // Build list rows: SW_0 = self, SW_1..SW_N = managed persons
+            List<Map<String, String>> rows = new java.util.ArrayList<>();
+            rows.add(Map.of("id", "SW_0", "title", self.getName() + " (You)"));
+            for (int i = 0; i < managed.size(); i++) {
+                rows.add(Map.of("id", "SW_" + (i + 1), "title", managed.get(i).getName()));
+            }
+
+            whatsAppApiService.sendListMessage(phone, "Who would you like to act as?",
+                "Select person", "People", rows);
+            return ""; // interactive message already sent
 
         } catch (Exception e) {
             log.error("Error loading users: {}", e.getMessage(), e);
@@ -485,25 +555,30 @@ public class ChatbotService {
     }
 
     private String handleSwitchUser(String phone, String msg, ConversationState state) {
-        int choice;
+        int index;
         try {
-            choice = Integer.parseInt(msg);
+            if (msg.startsWith("SW_")) {
+                // Interactive list reply — 0-indexed
+                index = Integer.parseInt(msg.substring(3));
+            } else {
+                // Plain number fallback — 1-indexed
+                index = Integer.parseInt(msg) - 1;
+            }
         } catch (NumberFormatException e) {
-            return "Please enter a valid number.";
+            return "Please select from the list.";
         }
 
-        if (state.managedUsers == null || choice < 1 || choice > state.managedUsers.size()) {
-            return "Invalid choice. Please enter a number from the list.";
+        if (state.managedUsers == null || index < 0 || index >= state.managedUsers.size()) {
+            return "Invalid selection. Please choose from the list.";
         }
 
-        User selected = state.managedUsers.get(choice - 1);
+        User selected = state.managedUsers.get(index);
         state.activeUserId = selected.getId();
         state.activeUserName = selected.getName();
         state.managedUsers = null;
 
-        return "Switched to: " + selected.getName() + "\n\n" +
-               "All actions will now be for " + selected.getName() + ".\n\n" +
-               showMainMenu(phone, selected.getName());
+        showMainMenu(phone, selected.getName());
+        return "";
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -537,14 +612,15 @@ public class ChatbotService {
             state.step = Step.EVENT_CHOICE;
             states.put(phone, state);
 
-            return "Welcome!\n\n" +
-                   "Event: " + event.getEventName() + "\n" +
-                   "Date: " + event.getEventDate() + "\n" +
-                   "Host: " + event.getHost().getName() + "\n\n" +
-                   "What would you like to do?\n\n" +
-                   "1. Give a gift\n" +
-                   "2. View my payments\n\n" +
-                   "(Type 1 or 2)";
+            String body = "Event: " + event.getEventName() +
+                          "\nDate: " + event.getEventDate() +
+                          "\nHost: " + event.getHost().getName() +
+                          "\n\nWhat would you like to do?";
+            whatsAppApiService.sendButtonMessage(phone, body, List.of(
+                Map.of("id", "EVT_1", "title", "Give a gift"),
+                Map.of("id", "EVT_2", "title", "View my payments")
+            ));
+            return "";
 
         } catch (EventNotFoundException e) {
             return "Event not found. The QR code may be invalid.";
@@ -552,7 +628,9 @@ public class ChatbotService {
     }
 
     private String handleEventChoice(String phone, String msg, ConversationState state) {
-        if ("1".equals(msg)) {
+        // Accept interactive IDs (EVT_1, EVT_2) or plain numbers
+        String choice = msg.startsWith("EVT_") ? msg.substring(4) : msg;
+        if ("1".equals(choice)) {
             // Check if user info is already known
             User user = getActiveUser(phone, state);
             if (user != null) {
@@ -565,12 +643,21 @@ public class ChatbotService {
             state.step = Step.GIFT_NAME;
             return "Let's start your contribution.\n\nWhat's your name?";
         }
-        if ("2".equals(msg)) {
+        if ("2".equals(choice)) {
             return showPaymentsForEvent(phone, state);
         }
-        return "Please type 1 or 2:\n\n" +
-               "1. Give a gift\n" +
-               "2. View my payments";
+        // Re-send buttons
+        try {
+            Event event = eventService.findByQrCode(state.eventCode);
+            String body = "Event: " + event.getEventName() + "\n\nWhat would you like to do?";
+            whatsAppApiService.sendButtonMessage(phone, body, List.of(
+                Map.of("id", "EVT_1", "title", "Give a gift"),
+                Map.of("id", "EVT_2", "title", "View my payments")
+            ));
+            return "";
+        } catch (Exception e) {
+            return "Please tap one of the buttons above.";
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -592,11 +679,11 @@ public class ChatbotService {
     }
 
     private String handleGiftAmount(String phone, String msg, ConversationState state) {
-        long amount;
+        double amount;
         try {
-            amount = Long.parseLong(msg.replaceAll("[^0-9]", ""));
+            amount = Double.parseDouble(msg.replaceAll("[^0-9.]", ""));
         } catch (NumberFormatException e) {
-            return "Please enter a valid amount (numbers only):";
+            return "Please enter a valid amount (e.g. 500 or 150.50):";
         }
         if (amount <= 0) {
             return "Amount must be greater than 0. Please try again:";
@@ -612,7 +699,7 @@ public class ChatbotService {
             StringBuilder sb = new StringBuilder();
             sb.append("Confirm your contribution:\n\n");
             sb.append("Event: ").append(event.getEventName()).append("\n");
-            sb.append("Amount: Rs. ").append(amount).append("\n");
+            sb.append("Amount: Rs. ").append(String.format("%.2f", amount)).append("\n");
 
             if (hostUpiId != null && !hostUpiId.isBlank()) {
                 sb.append("\nPay via UPI: ").append(hostUpiId).append("\n");
@@ -658,7 +745,7 @@ public class ChatbotService {
             states.remove(phone);
 
             return "Payment confirmed! Thank you!\n\n" +
-                   "Amount: Rs. " + state.amount + "\n" +
+                   "Amount: Rs. " + String.format("%.2f", state.amount) + "\n" +
                    "Event: " + event.getEventName() + "\n" +
                    "Transaction ID: " + txnId + "\n\n" +
                    thankYou + "\n\n" +
@@ -696,11 +783,11 @@ public class ChatbotService {
             StringBuilder sb = new StringBuilder();
             sb.append("Your Payments for ").append(event.getEventName()).append("\n\n");
 
-            long total = 0;
+            double total = 0.0;
             int i = 1;
             for (Hisab h : payments) {
                 sb.append("--- Payment ").append(i++).append(" ---\n");
-                sb.append("Amount: Rs. ").append(h.getAmount()).append("\n");
+                sb.append("Amount: Rs. ").append(String.format("%.2f", h.getAmount())).append("\n");
                 sb.append("Status: ").append(h.getPaymentStatus()).append("\n");
                 if (h.getCompletedAt() != null) {
                     sb.append("Date: ").append(h.getCompletedAt().format(fmt)).append("\n");
@@ -709,7 +796,7 @@ public class ChatbotService {
                 if (h.isCompleted()) total += h.getAmount();
             }
 
-            sb.append("---\nTotal Paid: Rs. ").append(total).append("\n\n");
+            sb.append("---\nTotal Paid: Rs. ").append(String.format("%.2f", total)).append("\n\n");
             sb.append("Type 'hi' for main menu.");
 
             return sb.toString();
@@ -780,10 +867,10 @@ public class ChatbotService {
         String tempPlace;
         String eventCode;
         int eventId;
-        long amount;
+        double amount;
         String pendingEventCode;
 
-        // Switch user
+        // Person list (pre-loaded in showMainMenu for combined action IDs)
         List<User> managedUsers;
     }
 
@@ -796,7 +883,7 @@ public class ChatbotService {
         EDIT_NAME, EDIT_PLACE,
         // Add person
         ADD_PERSON_NAME, ADD_PERSON_PLACE, ADD_PERSON_PHONE,
-        // Switch user
+        // Switch user (legacy)
         SWITCH_USER,
         // Event choice (QR scan)
         EVENT_CHOICE,

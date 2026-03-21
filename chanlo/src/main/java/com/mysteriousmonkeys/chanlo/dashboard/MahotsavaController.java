@@ -140,6 +140,26 @@ public class MahotsavaController {
         }
     }
 
+    /**
+     * Delete an event (only if all helpers are settled)
+     * DELETE /api/app/events/{eventId}
+     */
+    @DeleteMapping("/events/{eventId}")
+    public ResponseEntity<?> deleteEvent(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable int eventId) {
+
+        AuthService.AuthSession session = validateAuth(authHeader);
+        if (session == null) return unauthorized();
+
+        try {
+            eventService.deleteEvent(eventId);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Event deleted"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     // ==================== HELPER MANAGEMENT (Host) ====================
 
     /**
@@ -223,7 +243,7 @@ public class MahotsavaController {
 
         try {
             int helperId = (int) request.get("helperId");
-            Long amount = ((Number) request.get("amount")).longValue();
+            Double amount = ((Number) request.get("amount")).doubleValue();
             String note = (String) request.getOrDefault("note", null);
 
             Settlement settlement = helperService.settleWithHelper(
@@ -313,6 +333,42 @@ public class MahotsavaController {
     }
 
     /**
+     * Host: Accept a gift directly from a guest
+     * POST /api/app/host/collect
+     * Body: { "eventId": 1, "guestName": "Ramesh", "guestPlace": "Surat",
+     *         "guestPhone": "9876543210", "amount": 1100, "paymentMethod": "CASH" }
+     */
+    @PostMapping("/host/collect")
+    public ResponseEntity<?> hostCollectMoney(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody Map<String, Object> request) {
+
+        AuthService.AuthSession session = validateAuth(authHeader);
+        if (session == null) return unauthorized();
+
+        try {
+            int eventId = (int) request.get("eventId");
+            String guestName = (String) request.get("guestName");
+            String guestPlace = (String) request.getOrDefault("guestPlace", "");
+            String guestPhone = (String) request.get("guestPhone");
+            Double amount = ((Number) request.get("amount")).doubleValue();
+            PaymentMethod method = PaymentMethod.valueOf((String) request.getOrDefault("paymentMethod", "CASH"));
+
+            Hisab hisab = helperService.hostCollectMoney(
+                eventId, session.userId(), guestName, guestPlace, guestPhone, amount, method);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Gift recorded",
+                "hisabId", hisab.getHisabId(),
+                "verificationQr", hisab.getVerificationQrData()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    /**
      * Helper: Collect money from a guest
      * POST /api/app/helper/collect
      * Body: { "eventId": 1, "guestName": "Ramesh", "guestPlace": "Surat",
@@ -331,7 +387,7 @@ public class MahotsavaController {
             String guestName = (String) request.get("guestName");
             String guestPlace = (String) request.getOrDefault("guestPlace", "");
             String guestPhone = (String) request.get("guestPhone");
-            Long amount = ((Number) request.get("amount")).longValue();
+            Double amount = ((Number) request.get("amount")).doubleValue();
             PaymentMethod method = PaymentMethod.valueOf((String) request.getOrDefault("paymentMethod", "CASH"));
 
             Hisab hisab = helperService.collectMoney(
@@ -364,7 +420,7 @@ public class MahotsavaController {
         try {
             int eventId = (int) request.get("eventId");
             String reason = (String) request.get("reason");
-            Long amount = ((Number) request.get("amount")).longValue();
+            Double amount = ((Number) request.get("amount")).doubleValue();
 
             Expense expense = helperService.recordExpense(eventId, session.userId(), reason, amount);
             return ResponseEntity.ok(Map.of("success", true, "expense", expense));

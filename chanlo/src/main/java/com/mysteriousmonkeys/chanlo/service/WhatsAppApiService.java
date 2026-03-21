@@ -11,6 +11,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -279,6 +280,132 @@ public class WhatsAppApiService {
      */
     private String uploadMedia(byte[] fileBytes, String filename) {
         return uploadMedia(fileBytes, filename, MediaType.valueOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+    }
+
+    /**
+     * Send interactive reply buttons (up to 3 buttons).
+     * User taps one — WhatsApp sends back an "interactive" message with the button id.
+     *
+     * @param to      phone number
+     * @param body    main message text
+     * @param buttons list of {id, title} — max 3
+     */
+    public boolean sendButtonMessage(String to, String body, List<Map<String, String>> buttons) {
+        try {
+            String formattedTo = formatPhoneNumber(to);
+            String url = apiUrl + "/" + phoneNumberId + "/messages";
+
+            List<Map<String, Object>> buttonList = buttons.stream().map(b -> {
+                Map<String, Object> reply = new HashMap<>();
+                reply.put("id", b.get("id"));
+                reply.put("title", b.get("title"));
+                Map<String, Object> btn = new HashMap<>();
+                btn.put("type", "reply");
+                btn.put("reply", reply);
+                return btn;
+            }).toList();
+
+            Map<String, Object> action = new HashMap<>();
+            action.put("buttons", buttonList);
+
+            Map<String, Object> bodyMap = new HashMap<>();
+            bodyMap.put("text", body);
+
+            Map<String, Object> interactive = new HashMap<>();
+            interactive.put("type", "button");
+            interactive.put("body", bodyMap);
+            interactive.put("action", action);
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("messaging_product", "whatsapp");
+            payload.put("recipient_type", "individual");
+            payload.put("to", formattedTo);
+            payload.put("type", "interactive");
+            payload.put("interactive", interactive);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(accessToken);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            log.error("Error sending button message to {}: {}", to, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Send interactive list message (dropdown).
+     * User taps button to open list, selects a row — WhatsApp sends back an "interactive" message.
+     *
+     * @param to           phone number
+     * @param body         main message text
+     * @param buttonLabel  label on the button that opens the list (max 20 chars)
+     * @param sectionTitle title of the section inside the list
+     * @param rows         list of {id, title, description(optional)}
+     */
+    /**
+     * Single-section convenience overload (backward-compatible).
+     */
+    public boolean sendListMessage(String to, String body, String buttonLabel,
+                                   String sectionTitle, List<Map<String, String>> rows) {
+        List<Map<String, Object>> rowList = rows.stream().map(r -> {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", r.get("id"));
+            row.put("title", r.get("title"));
+            if (r.containsKey("description")) row.put("description", r.get("description"));
+            return row;
+        }).toList();
+        Map<String, Object> section = new HashMap<>();
+        section.put("title", sectionTitle);
+        section.put("rows", rowList);
+        return sendListMessageSections(to, body, buttonLabel, List.of(section));
+    }
+
+    /**
+     * Multi-section list message.
+     * Each section: { "title": "...", "rows": [ {"id","title","description?"} ] }
+     */
+    public boolean sendListMessageSections(String to, String body, String buttonLabel,
+                                           List<Map<String, Object>> sections) {
+        try {
+            String formattedTo = formatPhoneNumber(to);
+            String url = apiUrl + "/" + phoneNumberId + "/messages";
+
+            Map<String, Object> action = new HashMap<>();
+            action.put("button", buttonLabel);
+            action.put("sections", sections);
+
+            Map<String, Object> bodyMap = new HashMap<>();
+            bodyMap.put("text", body);
+
+            Map<String, Object> interactive = new HashMap<>();
+            interactive.put("type", "list");
+            interactive.put("body", bodyMap);
+            interactive.put("action", action);
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("messaging_product", "whatsapp");
+            payload.put("recipient_type", "individual");
+            payload.put("to", formattedTo);
+            payload.put("type", "interactive");
+            payload.put("interactive", interactive);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(accessToken);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            log.error("Error sending list message to {}: {}", to, e.getMessage(), e);
+            return false;
+        }
     }
 
     /**

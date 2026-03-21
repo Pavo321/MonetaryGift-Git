@@ -1,15 +1,35 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
-const BASE_URL = 'https://009d-2402-a00-10a-78ce-a0ac-2e70-665d-c1e5.ngrok-free.app';
+const BASE_URL = 'https://686f-2402-a00-10a-78ce-59b5-a603-701c-e60.ngrok-free.app';
 
 const TOKEN_KEY = '@mahotsava_token';
 const USER_KEY = '@mahotsava_user';
+const CACHE_PREFIX = '@cache_';
+const QUEUE_KEY = '@offline_queue';
+
+type QueuedRequest = {
+  id: string;
+  path: string;
+  method: string;
+  body?: string;
+  timestamp: number;
+};
 
 class ApiService {
   private token: string | null = null;
+  isOnline: boolean = true;
 
   async init() {
     this.token = await AsyncStorage.getItem(TOKEN_KEY);
+    // Monitor connectivity
+    NetInfo.addEventListener(state => {
+      const wasOffline = !this.isOnline;
+      this.isOnline = !!(state.isConnected && state.isInternetReachable);
+      if (wasOffline && this.isOnline) {
+        this.syncQueue();
+      }
+    });
   }
 
   async setToken(token: string) {
@@ -36,8 +56,66 @@ class ApiService {
     return this.token;
   }
 
-  // Callback for handling session expiry (set by App.tsx)
   onSessionExpired: (() => void) | null = null;
+
+  // Cache helpers
+  private cacheKey(path: string) {
+    return CACHE_PREFIX + path.replace(/\//g, '_');
+  }
+
+  private async saveCache(path: string, data: any) {
+    try {
+      await AsyncStorage.setItem(this.cacheKey(path), JSON.stringify({data, ts: Date.now()}));
+    } catch {}
+  }
+
+  private async loadCache(path: string): Promise<any | null> {
+    try {
+      const raw = await AsyncStorage.getItem(this.cacheKey(path));
+      if (!raw) return null;
+      return JSON.parse(raw).data;
+    } catch {
+      return null;
+    }
+  }
+
+  // Offline queue helpers
+  private async enqueue(path: string, method: string, body?: string) {
+    try {
+      const raw = await AsyncStorage.getItem(QUEUE_KEY);
+      const queue: QueuedRequest[] = raw ? JSON.parse(raw) : [];
+      queue.push({id: Date.now() + '_' + Math.random(), path, method, body, timestamp: Date.now()});
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    } catch {}
+  }
+
+  async syncQueue() {
+    try {
+      const raw = await AsyncStorage.getItem(QUEUE_KEY);
+      if (!raw) return;
+      const queue: QueuedRequest[] = JSON.parse(raw);
+      if (queue.length === 0) return;
+
+      const remaining: QueuedRequest[] = [];
+      for (const item of queue) {
+        try {
+          await this.request(item.path, {method: item.method, body: item.body});
+        } catch {
+          remaining.push(item);
+        }
+      }
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
+    } catch {}
+  }
+
+  async getPendingQueueCount(): Promise<number> {
+    try {
+      const raw = await AsyncStorage.getItem(QUEUE_KEY);
+      return raw ? JSON.parse(raw).length : 0;
+    } catch {
+      return 0;
+    }
+  }
 
   private async request(path: string, options: RequestInit = {}) {
     const headers: any = {
@@ -55,7 +133,6 @@ class ApiService {
       headers,
     });
 
-    // Handle 401 - clear stale token and notify app to redirect to login
     if (response.status === 401) {
       await this.clearToken();
       if (this.onSessionExpired) {
@@ -66,6 +143,40 @@ class ApiService {
 
     const data = await response.json();
     return data;
+  }
+
+  // GET with offline cache fallback
+  private async get(path: string): Promise<any> {
+    try {
+      const data = await this.request(path);
+      if (data && data.success !== false) {
+        await this.saveCache(path, data);
+        this.isOnline = true;
+      }
+      return data;
+    } catch {
+      this.isOnline = false;
+      const cached = await this.loadCache(path);
+      if (cached) return {...cached, _fromCache: true};
+      throw new Error('No internet connection and no cached data available');
+    }
+  }
+
+  // POST/DELETE — queue if offline
+  private async mutate(path: string, method: string, body?: object): Promise<any> {
+    const bodyStr = body ? JSON.stringify(body) : undefined;
+    try {
+      const data = await this.request(path, {method, body: bodyStr});
+      this.isOnline = true;
+      return data;
+    } catch {
+      this.isOnline = false;
+      if (method !== 'DELETE') {
+        await this.enqueue(path, method, bodyStr);
+        return {success: true, _queued: true, message: 'Saved offline. Will sync when connected.'};
+      }
+      throw new Error('Cannot delete while offline');
+    }
   }
 
   // Auth
@@ -102,7 +213,7 @@ class ApiService {
   }
 
   async getMe() {
-    return this.request('/api/auth/me');
+    return this.get('/api/auth/me');
   }
 
   async logout() {
@@ -112,18 +223,19 @@ class ApiService {
 
   // Events
   async createEvent(eventName: string, eventDate: string, hostMessage?: string) {
-    return this.request('/api/app/events', {
-      method: 'POST',
-      body: JSON.stringify({eventName, eventDate, hostMessage}),
-    });
+    return this.mutate('/api/app/events', 'POST', {eventName, eventDate, hostMessage});
   }
 
   async getMyEvents() {
-    return this.request('/api/app/events');
+    return this.get('/api/app/events');
   }
 
   async getEventDetails(eventId: number) {
-    return this.request(`/api/app/events/${eventId}`);
+    return this.get(`/api/app/events/${eventId}`);
+  }
+
+  async deleteEvent(eventId: number) {
+    return this.mutate(`/api/app/events/${eventId}`, 'DELETE');
   }
 
   getEventQrUrl(eventId: number): string {
@@ -136,32 +248,24 @@ class ApiService {
 
   // Helpers
   async getHelpers(eventId: number) {
-    return this.request(`/api/app/events/${eventId}/helpers`);
+    return this.get(`/api/app/events/${eventId}/helpers`);
   }
 
   async addHelper(eventId: number, phoneNumber: string, canExpense: boolean = false, helperName?: string) {
-    return this.request(`/api/app/events/${eventId}/helpers`, {
-      method: 'POST',
-      body: JSON.stringify({phoneNumber, canExpense, helperName}),
-    });
+    return this.mutate(`/api/app/events/${eventId}/helpers`, 'POST', {phoneNumber, canExpense, helperName});
   }
 
   async removeHelper(eventId: number, helperId: number) {
-    return this.request(`/api/app/events/${eventId}/helpers/${helperId}`, {
-      method: 'DELETE',
-    });
+    return this.mutate(`/api/app/events/${eventId}/helpers/${helperId}`, 'DELETE');
   }
 
   // Settlement
   async settleWithHelper(eventId: number, helperId: number, amount: number, note?: string) {
-    return this.request(`/api/app/events/${eventId}/settle`, {
-      method: 'POST',
-      body: JSON.stringify({helperId, amount, note}),
-    });
+    return this.mutate(`/api/app/events/${eventId}/settle`, 'POST', {helperId, amount, note});
   }
 
   async getSettlements(eventId: number) {
-    return this.request(`/api/app/events/${eventId}/settlements`);
+    return this.get(`/api/app/events/${eventId}/settlements`);
   }
 
   // Collection (Helper)
@@ -173,55 +277,52 @@ class ApiService {
     guestPlace?: string,
     paymentMethod: string = 'CASH',
   ) {
-    return this.request('/api/app/helper/collect', {
-      method: 'POST',
-      body: JSON.stringify({eventId, guestName, guestPlace, guestPhone, amount, paymentMethod}),
-    });
+    return this.mutate('/api/app/helper/collect', 'POST', {eventId, guestName, guestPlace, guestPhone, amount, paymentMethod});
+  }
+
+  // Host: accept gift directly
+  async hostCollectMoney(
+    eventId: number,
+    guestName: string,
+    guestPhone: string,
+    amount: number,
+    guestPlace?: string,
+    paymentMethod: string = 'CASH',
+  ) {
+    return this.mutate('/api/app/host/collect', 'POST', {eventId, guestName, guestPlace, guestPhone, amount, paymentMethod});
   }
 
   // Expense (Helper)
   async recordExpense(eventId: number, reason: string, amount: number) {
-    return this.request('/api/app/helper/expense', {
-      method: 'POST',
-      body: JSON.stringify({eventId, reason, amount}),
-    });
+    return this.mutate('/api/app/helper/expense', 'POST', {eventId, reason, amount});
   }
 
   async getExpenses(eventId: number) {
-    return this.request(`/api/app/events/${eventId}/expenses`);
+    return this.get(`/api/app/events/${eventId}/expenses`);
   }
 
   // Verify
   async verifyPayment(qrData: string) {
-    return this.request('/api/app/verify', {
-      method: 'POST',
-      body: JSON.stringify({qrData}),
-    });
+    return this.mutate('/api/app/verify', 'POST', {qrData});
   }
 
   // Helper: get assigned events
   async getHelperEvents() {
-    return this.request('/api/app/helper/events');
+    return this.get('/api/app/helper/events');
   }
 
   // Helper validate
   async validateHelperAccess(eventId: number) {
-    return this.request('/api/app/helper/validate', {
-      method: 'POST',
-      body: JSON.stringify({eventId}),
-    });
+    return this.mutate('/api/app/helper/validate', 'POST', {eventId});
   }
 
   // Profile
   async getProfile() {
-    return this.request('/api/app/profile');
+    return this.get('/api/app/profile');
   }
 
   async updateProfile(data: {name?: string; place?: string; email?: string; pincode?: string}) {
-    return this.request('/api/app/profile', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    return this.mutate('/api/app/profile', 'PUT', data);
   }
 }
 

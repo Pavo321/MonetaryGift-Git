@@ -133,11 +133,12 @@ public class HelperService {
 
         return helpers.stream().map(eh -> {
             User helper = eh.getHelper();
-            Long cashCollected = moneyRepository.getTotalCashCollectedByHelper(event, helper);
-            Long totalSettled = settlementRepository.getTotalSettledByEventAndHelper(event, helper);
-            Long totalExpense = expenseRepository.getTotalExpenseByEventAndHelper(event, helper);
-            // Amount to hand back = cash collected - settled only (expenses tracked separately)
-            Long amountToHandBack = cashCollected - totalSettled;
+            Double cashCollected = moneyRepository.getTotalCashCollectedByHelper(event, helper);
+            Double upiCollected = moneyRepository.getTotalUpiCollectedByHelper(event, helper);
+            Double totalSettled = settlementRepository.getTotalSettledByEventAndHelper(event, helper);
+            Double totalExpense = expenseRepository.getTotalExpenseByEventAndHelper(event, helper);
+            // Amount to hand back = cash only (UPI goes directly to host account)
+            Double amountToHandBack = cashCollected - totalSettled;
 
             return new HelperSummary(
                 helper.getId(),
@@ -145,6 +146,7 @@ public class HelperService {
                 helper.getPhoneNumber(),
                 true,
                 cashCollected,
+                upiCollected,
                 amountToHandBack,
                 totalExpense,
                 eh.isCanExpense()
@@ -152,10 +154,55 @@ public class HelperService {
         }).toList();
     }
 
+    // --- Collection (Host direct collection) ---
+
+    public Hisab hostCollectMoney(int eventId, int hostId, String guestName, String guestPlace,
+                                  String guestPhone, Double amount, PaymentMethod paymentMethod) {
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        User host = userRepository.findById(hostId)
+            .orElseThrow(() -> new UserNotFoundException("Host not found"));
+
+        // Find or create guest
+        User guest = userRepository.findByPhoneNumber(guestPhone)
+            .orElseGet(() -> {
+                User newGuest = User.createGuest(guestName, guestPlace, guestPhone);
+                return userRepository.save(newGuest);
+            });
+
+        if (!guest.getName().equals(guestName)) {
+            guest.setName(guestName);
+            guest.setVillage(guestPlace);
+            guest = userRepository.save(guest);
+        }
+
+        Hisab hisab = new Hisab();
+        hisab.setEvent(event);
+        hisab.setGuest(guest);
+        hisab.setCollectedBy(host);
+        hisab.setAmount(amount);
+        hisab.setPaymentMethod(paymentMethod);
+        hisab.setPaymentStatus(PaymentStatus.SUCCESS);
+        hisab.setCompletedAt(LocalDateTime.now());
+
+        String verificationData = String.format("VERIFY_%d_%s_%.0f_%d",
+            event.getEventId(), guest.getPhoneNumber(), amount, System.currentTimeMillis());
+        hisab.setVerificationQrData(verificationData);
+
+        hisab = moneyRepository.save(hisab);
+
+        log.info("Host collected: event={}, guest={}, amount={}, host={}",
+            eventId, guestName, amount, host.getName());
+
+        sendCollectionConfirmation(hisab, event, guest, host);
+
+        return hisab;
+    }
+
     // --- Collection (Helper operations) ---
 
     public Hisab collectMoney(int eventId, int helperId, String guestName, String guestPlace,
-                              String guestPhone, Long amount, PaymentMethod paymentMethod) {
+                              String guestPhone, Double amount, PaymentMethod paymentMethod) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
         User helper = userRepository.findById(helperId)
@@ -211,7 +258,7 @@ public class HelperService {
             String message = String.format(
                 "Payment Recorded!\n\n" +
                 "Event: %s\n" +
-                "Amount: Rs. %d\n" +
+                "Amount: Rs. %.2f\n" +
                 "Method: %s\n" +
                 "Collected by: %s\n" +
                 "Date: %s\n\n" +
@@ -234,7 +281,7 @@ public class HelperService {
 
     // --- Expense (Helper operations) ---
 
-    public Expense recordExpense(int eventId, int helperId, String reason, Long amount) {
+    public Expense recordExpense(int eventId, int helperId, String reason, Double amount) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
         User helper = userRepository.findById(helperId)
@@ -249,13 +296,13 @@ public class HelperService {
         }
 
         // Validate: cannot expense more than cash collected
-        Long cashCollected = moneyRepository.getTotalCashCollectedByHelper(event, helper);
-        Long totalExpense = expenseRepository.getTotalExpenseByEventAndHelper(event, helper);
-        Long availableCash = cashCollected - totalExpense;
+        Double cashCollected = moneyRepository.getTotalCashCollectedByHelper(event, helper);
+        Double totalExpense = expenseRepository.getTotalExpenseByEventAndHelper(event, helper);
+        Double availableCash = cashCollected - totalExpense;
 
         if (amount > availableCash) {
             throw new RuntimeException(String.format(
-                "Insufficient funds. You collected Rs. %d, already spent Rs. %d. Available: Rs. %d",
+                "Insufficient funds. You collected Rs. %.2f, already spent Rs. %.2f. Available: Rs. %.2f",
                 cashCollected, totalExpense, availableCash));
         }
 
@@ -271,12 +318,12 @@ public class HelperService {
     public List<Expense> getExpensesByEvent(int eventId) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
-        return expenseRepository.findByEvent(event);
+        return expenseRepository.findByEventOrderByIdDesc(event);
     }
 
     // --- Settlement (Host operations) ---
 
-    public Settlement settleWithHelper(int eventId, int helperId, int hostId, Long amount, String note) {
+    public Settlement settleWithHelper(int eventId, int helperId, int hostId, Double amount, String note) {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
         User helper = userRepository.findById(helperId)
@@ -337,13 +384,15 @@ public class HelperService {
             .filter(EventHelper::isActive)
             .map(eh -> {
                 Event event = eh.getEvent();
-                Long cashCollected = moneyRepository.getTotalCashCollectedByHelper(event, helper);
-                Long totalExpense = expenseRepository.getTotalExpenseByEventAndHelper(event, helper);
+                Double cashCollected = moneyRepository.getTotalCashCollectedByHelper(event, helper);
+                Double upiCollected = moneyRepository.getTotalUpiCollectedByHelper(event, helper);
+                Double totalExpense = expenseRepository.getTotalExpenseByEventAndHelper(event, helper);
                 return new HelperEventSummary(
                     event.getEventId(),
                     event.getEventName(),
                     event.getEventDate(),
                     cashCollected,
+                    upiCollected,
                     totalExpense,
                     eh.isCanExpense()
                 );
@@ -367,9 +416,10 @@ public class HelperService {
         String name,
         String phoneNumber,
         boolean isActive,
-        Long totalCollected,
-        Long amountToHandBack,
-        Long totalExpense,
+        Double cashCollected,
+        Double upiCollected,
+        Double amountToHandBack,
+        Double totalExpense,
         boolean canExpense
     ) {}
 
@@ -377,8 +427,9 @@ public class HelperService {
         int eventId,
         String eventName,
         java.time.LocalDate eventDate,
-        Long totalCollected,
-        Long totalExpense,
+        Double cashCollected,
+        Double upiCollected,
+        Double totalExpense,
         boolean canExpense
     ) {}
 
@@ -386,7 +437,7 @@ public class HelperService {
 
     public record VerificationDetails(
         String guestName,
-        Long amount,
+        Double amount,
         String eventName,
         LocalDateTime date,
         String collectedBy,

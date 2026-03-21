@@ -14,9 +14,12 @@ public record EventResponse(
     String qrCodeImageUrl,
     EventStatus status,
     Long totalGiftsReceived,
-    Long totalAmount
+    Double totalAmount,
+    Double cashAmount,
+    Double upiAmount
 ) {
-    public static EventResponse from(Event event, Long totalAmount, Long giftCount) {
+    public static EventResponse from(Event event, Double totalAmount, Long giftCount,
+                                     Double cashAmount, Double upiAmount) {
         return new EventResponse(
             event.getEventId(),
             event.getEventName(),
@@ -26,8 +29,9 @@ public record EventResponse(
             event.getQrCodeImageUrl(),
             event.getStatus(),
             giftCount,
-            totalAmount
+            totalAmount,
+            cashAmount,
+            upiAmount
         );
     }
 }
-

@@ -113,7 +113,7 @@ public class GuestHistoryController {
             "persons", persons,
             "totalAmount", payments.stream()
                 .filter(h -> h.getPaymentStatus() == com.mysteriousmonkeys.chanlo.money.PaymentStatus.SUCCESS)
-                .mapToLong(Hisab::getAmount)
+                .mapToDouble(Hisab::getAmount)
                 .sum()
         ));
     }

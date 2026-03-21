@@ -19,11 +19,23 @@ export default function ExpenseScreen({route}: any) {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [cashCollected, setCashCollected] = useState<number>(0);
+  const [upiCollected, setUpiCollected] = useState<number>(0);
 
   const loadExpenses = useCallback(async () => {
     try {
-      const res = await api.getExpenses(eventId);
-      if (res.success) setExpenses(res.expenses || []);
+      const [expRes, eventsRes] = await Promise.all([
+        api.getExpenses(eventId),
+        api.getHelperEvents(),
+      ]);
+      if (expRes.success) setExpenses(expRes.expenses || []);
+      if (eventsRes.success && eventsRes.events) {
+        const ev = eventsRes.events.find((e: any) => e.eventId === eventId);
+        if (ev) {
+          setCashCollected(ev.cashCollected || 0);
+          setUpiCollected(ev.upiCollected || 0);
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -40,7 +52,7 @@ export default function ExpenseScreen({route}: any) {
       Alert.alert('Required', 'Enter expense reason');
       return;
     }
-    const amt = parseInt(amount, 10);
+    const amt = parseFloat(amount);
     if (!amt || amt <= 0) {
       Alert.alert('Required', 'Enter valid amount');
       return;
@@ -53,7 +65,7 @@ export default function ExpenseScreen({route}: any) {
         setReason('');
         setAmount('');
         loadExpenses();
-        Alert.alert('Recorded', `Expense of Rs. ${amt} recorded`);
+        Alert.alert('Recorded', `Expense of Rs. ${amt.toFixed(2)} recorded`);
       } else {
         Alert.alert('Error', res.message || 'Not permitted');
       }
@@ -68,12 +80,28 @@ export default function ExpenseScreen({route}: any) {
 
   return (
     <View style={styles.container}>
+      {/* Balance banner */}
+      <View style={styles.balanceRow}>
+        <View style={styles.balanceBox}>
+          <Ionicons name="cash-outline" size={14} color={colors.secondary} />
+          <Text style={styles.balanceLabel}>Cash collected</Text>
+          <AmountDisplay amount={cashCollected} color={colors.secondary} size="sm" />
+        </View>
+        <View style={styles.balanceDivider} />
+        <View style={styles.balanceBox}>
+          <Ionicons name="card-outline" size={14} color={colors.info} />
+          <Text style={styles.balanceLabel}>UPI (host's)</Text>
+          <AmountDisplay amount={upiCollected} color={colors.info} size="sm" />
+        </View>
+      </View>
+
       {/* Form */}
       <View style={styles.formCard}>
         <View style={styles.titleRow}>
           <Ionicons name="receipt-outline" size={20} color={colors.error} />
           <Text style={styles.title}>Record Expense</Text>
         </View>
+        <Text style={styles.cashNote}>Only cash money can be spent. UPI payments go directly to the host.</Text>
 
         <TextInput
           style={styles.input}
@@ -86,10 +114,10 @@ export default function ExpenseScreen({route}: any) {
         <TextInput
           style={[styles.input, styles.amountInput]}
           value={amount}
-          onChangeText={t => setAmount(t.replace(/[^0-9]/g, ''))}
-          placeholder="Amount"
+          onChangeText={t => setAmount(t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))}
+          placeholder="0.00"
           placeholderTextColor={colors.textMuted}
-          keyboardType="number-pad"
+          keyboardType="decimal-pad"
         />
 
         <IconButton
@@ -141,12 +169,28 @@ export default function ExpenseScreen({route}: any) {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: colors.background},
+  balanceRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  balanceBox: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: 2,
+  },
+  balanceDivider: {width: 1, backgroundColor: colors.divider, marginVertical: spacing.xs},
+  balanceLabel: {fontSize: fontSize.xs, color: colors.textMuted},
   formCard: {
     backgroundColor: colors.surface,
     padding: spacing.lg,
+    marginTop: spacing.sm,
     ...shadows.sm,
   },
-  titleRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md},
+  cashNote: {fontSize: fontSize.xs, color: colors.textMuted, marginBottom: spacing.sm, fontStyle: 'italic'},
+  titleRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs},
   title: {fontSize: fontSize.lg, fontWeight: '700', color: colors.textPrimary},
   input: {
     borderWidth: 1,

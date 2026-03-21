@@ -10,7 +10,8 @@ interface AmountDisplayProps {
 }
 
 function formatIndian(num: number): string {
-  return num.toLocaleString('en-IN');
+  if (num % 1 === 0) return num.toLocaleString('en-IN');
+  return num.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 export default function AmountDisplay({

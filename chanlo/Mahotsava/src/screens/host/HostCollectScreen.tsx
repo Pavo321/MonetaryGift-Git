@@ -1,4 +1,4 @@
-import React, {useState, useRef, useCallback} from 'react';
+import React, {useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,11 @@ import {
 import {Camera, useCameraDevice, useCodeScanner} from 'react-native-vision-camera';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {colors, spacing, borderRadius, fontSize, shadows} from '../../theme/colors';
-import {IconButton, EmptyState} from '../../components';
+import {GradientHeader, IconButton} from '../../components';
 import {api} from '../../services/api';
 
-export default function CollectScreen({route}: any) {
-  const {eventId} = route.params;
+export default function HostCollectScreen({route, navigation}: any) {
+  const {eventId, eventName} = route.params;
   const [guestName, setGuestName] = useState('');
   const [guestPlace, setGuestPlace] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
@@ -69,7 +69,7 @@ export default function CollectScreen({route}: any) {
   const submitCollect = async (amt: number) => {
     setLoading(true);
     try {
-      const res = await api.collectMoney(
+      const res = await api.hostCollectMoney(
         eventId,
         guestName.trim(),
         guestPhone,
@@ -85,7 +85,7 @@ export default function CollectScreen({route}: any) {
         setAmount('');
         setScannedGuest(false);
         Alert.alert(
-          'Collected!',
+          'Gift Accepted!',
           `Rs. ${amt.toFixed(2)} from ${guestName} recorded.\nVerification ID: ${res.verificationQr || ''}`,
         );
       } else {
@@ -134,132 +134,137 @@ export default function CollectScreen({route}: any) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled">
-      <View style={styles.card}>
-        <View style={styles.titleRow}>
-          <Ionicons name="cash-outline" size={22} color={colors.secondary} />
-          <Text style={styles.title}>Collect Money</Text>
-        </View>
-        <Text style={styles.subtitle}>Record a contribution from a guest</Text>
-
-        {/* Scan QR button */}
-        <IconButton
-          icon="scan-outline"
-          label="Scan Guest QR"
-          variant="secondary"
-          onPress={openScanner}
-          style={styles.scanBtn}
-        />
-
-        {scannedGuest ? (
-          <View style={styles.scannedBanner}>
-            <View style={styles.scannedHeader}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.secondary} />
-              <Text style={styles.scannedTitle}>Guest Details (from QR)</Text>
-            </View>
-            <Text style={styles.scannedInfo}>
-              {guestName}{guestPlace ? ` - ${guestPlace}` : ''}{'\n'}
-              Phone: {guestPhone}
-            </Text>
-            <TouchableOpacity onPress={() => setScannedGuest(false)}>
-              <Text style={styles.scannedEdit}>Edit details</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or enter manually</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Text style={styles.label}>Guest Name *</Text>
-            <TextInput
-              style={styles.input}
-              value={guestName}
-              onChangeText={setGuestName}
-              placeholder="Enter guest name"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="words"
-            />
-
-            <Text style={styles.label}>Village / City</Text>
-            <TextInput
-              style={styles.input}
-              value={guestPlace}
-              onChangeText={setGuestPlace}
-              placeholder="Optional"
-              placeholderTextColor={colors.textMuted}
-            />
-
-            <Text style={styles.label}>Phone Number *</Text>
-            <TextInput
-              style={styles.input}
-              value={guestPhone}
-              onChangeText={t => setGuestPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
-              placeholder="10-digit number"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="phone-pad"
-              maxLength={10}
-            />
-          </>
-        )}
-
-        <Text style={styles.label}>Amount (Rs.) *</Text>
-        <TextInput
-          ref={amountRef}
-          style={[styles.input, styles.amountInput]}
-          value={amount}
-          onChangeText={t => setAmount(t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))}
-          placeholder="0.00"
-          placeholderTextColor={colors.textMuted}
-          keyboardType="decimal-pad"
-        />
-
-        {/* Payment method */}
-        <Text style={styles.label}>Payment Method</Text>
-        <View style={styles.methodRow}>
-          {(['CASH', 'UPI_QR'] as const).map(m => (
-            <TouchableOpacity
-              key={m}
-              style={[styles.methodBtn, method === m && styles.methodBtnActive]}
-              onPress={() => setMethod(m)}>
-              <Ionicons
-                name={m === 'CASH' ? 'cash-outline' : 'card-outline'}
-                size={18}
-                color={method === m ? colors.secondary : colors.textSecondary}
-              />
-              <Text style={[styles.methodText, method === m && styles.methodTextActive]}>
-                {m === 'CASH' ? 'Cash' : 'UPI'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <IconButton
-        icon="checkmark-circle"
-        label="Received"
-        variant="success"
-        onPress={handleCollect}
-        loading={loading}
-        style={styles.collectBtn}
+    <View style={styles.container}>
+      <GradientHeader
+        title="Accept Gift"
+        subtitle={eventName}
+        onBack={() => navigation.goBack()}
       />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <View style={styles.titleRow}>
+            <Ionicons name="gift-outline" size={22} color={colors.primary} />
+            <Text style={styles.title}>Record a Gift</Text>
+          </View>
+          <Text style={styles.subtitle}>Guest came directly to you</Text>
 
-      {/* Last result */}
-      {lastResult && (
-        <View style={styles.resultCard}>
-          <Ionicons name="checkmark-done-circle" size={24} color={colors.success} />
-          <View style={{marginLeft: spacing.sm, flex: 1}}>
-            <Text style={styles.resultTitle}>Last Collection</Text>
-            <Text style={styles.resultText}>Hisab #{lastResult.hisabId} recorded</Text>
-            <Text style={styles.resultText}>WhatsApp confirmation sent to guest</Text>
+          {/* Scan QR button */}
+          <IconButton
+            icon="scan-outline"
+            label="Scan Guest QR"
+            variant="secondary"
+            onPress={openScanner}
+            style={styles.scanBtn}
+          />
+
+          {scannedGuest ? (
+            <View style={styles.scannedBanner}>
+              <View style={styles.scannedHeader}>
+                <Ionicons name="checkmark-circle" size={20} color={colors.secondary} />
+                <Text style={styles.scannedTitle}>Guest Details (from QR)</Text>
+              </View>
+              <Text style={styles.scannedInfo}>
+                {guestName}{guestPlace ? ` - ${guestPlace}` : ''}{'\n'}
+                Phone: {guestPhone}
+              </Text>
+              <TouchableOpacity onPress={() => setScannedGuest(false)}>
+                <Text style={styles.scannedEdit}>Edit details</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or enter manually</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Text style={styles.label}>Guest Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={guestName}
+                onChangeText={setGuestName}
+                placeholder="Enter guest name"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+              />
+
+              <Text style={styles.label}>Village / City</Text>
+              <TextInput
+                style={styles.input}
+                value={guestPlace}
+                onChangeText={setGuestPlace}
+                placeholder="Optional"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.label}>Phone Number *</Text>
+              <TextInput
+                style={styles.input}
+                value={guestPhone}
+                onChangeText={t => setGuestPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+                placeholder="10-digit number"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+            </>
+          )}
+
+          <Text style={styles.label}>Amount (Rs.) *</Text>
+          <TextInput
+            ref={amountRef}
+            style={[styles.input, styles.amountInput]}
+            value={amount}
+            onChangeText={t => setAmount(t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))}
+            placeholder="0.00"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="decimal-pad"
+          />
+
+          <Text style={styles.label}>Payment Method</Text>
+          <View style={styles.methodRow}>
+            {(['CASH', 'UPI_QR'] as const).map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.methodBtn, method === m && styles.methodBtnActive]}
+                onPress={() => setMethod(m)}>
+                <Ionicons
+                  name={m === 'CASH' ? 'cash-outline' : 'card-outline'}
+                  size={18}
+                  color={method === m ? colors.primary : colors.textSecondary}
+                />
+                <Text style={[styles.methodText, method === m && styles.methodTextActive]}>
+                  {m === 'CASH' ? 'Cash' : 'UPI'}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-      )}
+
+        <IconButton
+          icon="checkmark-circle"
+          label="Accept Gift"
+          variant="primary"
+          onPress={handleCollect}
+          loading={loading}
+          style={styles.collectBtn}
+        />
+
+        {lastResult && (
+          <View style={styles.resultCard}>
+            <Ionicons name="checkmark-done-circle" size={24} color={colors.success} />
+            <View style={{marginLeft: spacing.sm, flex: 1}}>
+              <Text style={styles.resultTitle}>Last Gift Recorded</Text>
+              <Text style={styles.resultText}>Hisab #{lastResult.hisabId}</Text>
+              <Text style={styles.resultText}>WhatsApp confirmation sent to guest</Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
 
       {/* QR Scanner Modal */}
       <Modal
@@ -291,12 +296,13 @@ export default function CollectScreen({route}: any) {
           <Text style={styles.scannerHint}>Point camera at the guest's QR code</Text>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: colors.background},
+  scroll: {flex: 1},
   content: {padding: spacing.md, paddingBottom: spacing.xxl},
   card: {
     backgroundColor: colors.surface,
@@ -322,9 +328,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm + 2,
   },
-  methodBtnActive: {borderColor: colors.secondary, backgroundColor: '#E0F2F1'},
+  methodBtnActive: {borderColor: colors.primary, backgroundColor: '#E8EAF6'},
   methodText: {fontSize: fontSize.md, fontWeight: '600', color: colors.textSecondary},
-  methodTextActive: {color: colors.secondary},
+  methodTextActive: {color: colors.primary},
   scanBtn: {marginBottom: spacing.sm},
   collectBtn: {marginTop: spacing.lg},
   scannedBanner: {
@@ -359,7 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     paddingTop: spacing.xl,
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primary,
   },
   scannerTitle: {fontSize: fontSize.lg, fontWeight: '700', color: colors.textLight},
   scannerCloseBtn: {

@@ -66,8 +66,14 @@ export default function HelperDashboardScreen({navigation}: any) {
         </View>
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <AmountDisplay amount={item.totalCollected || 0} color={colors.secondary} size="sm" />
-            <Text style={styles.statLabel}>Collected</Text>
+            <Ionicons name="cash-outline" size={13} color={colors.secondary} />
+            <AmountDisplay amount={item.cashCollected || 0} color={colors.secondary} size="sm" />
+            <Text style={styles.statLabel}>Cash</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="card-outline" size={13} color={colors.info} />
+            <AmountDisplay amount={item.upiCollected || 0} color={colors.info} size="sm" />
+            <Text style={styles.statLabel}>UPI</Text>
           </View>
           <View style={styles.statBox}>
             <AmountDisplay amount={item.totalExpense || 0} color={colors.error} size="sm" />

@@ -23,6 +23,7 @@ import CreateEventScreen from './src/screens/host/CreateEventScreen';
 import EventDetailScreen from './src/screens/host/EventDetailScreen';
 import HelpersScreen from './src/screens/host/HelpersScreen';
 import SettlementScreen from './src/screens/host/SettlementScreen';
+import HostCollectScreen from './src/screens/host/HostCollectScreen';
 
 // Helper screens
 import HelperDashboardScreen from './src/screens/helper/HelperDashboardScreen';
@@ -222,6 +223,7 @@ function App() {
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="Helpers" component={HelpersScreen} />
           <Stack.Screen name="Settlement" component={SettlementScreen} />
+          <Stack.Screen name="HostCollect" component={HostCollectScreen} />
 
           {/* Helper flow */}
           <Stack.Screen name="HelperTabs" component={HelperTabs} />
