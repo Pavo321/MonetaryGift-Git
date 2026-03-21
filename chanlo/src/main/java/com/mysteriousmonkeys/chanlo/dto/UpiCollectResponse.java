@@ -8,12 +8,12 @@ public record UpiCollectResponse(
     String collectRequestId,
     String hostUpiId,
     String guestUpiId,
-    Long amount,
+    Double amount,
     UpiCollectStatus status,
     String message
 ) {
     public static UpiCollectResponse success(int hisabId, String collectRequestId,
-            String hostUpiId, String guestUpiId, Long amount) {
+            String hostUpiId, String guestUpiId, Double amount) {
         return new UpiCollectResponse(
             hisabId,
             collectRequestId,

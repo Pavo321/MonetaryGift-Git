@@ -15,8 +15,8 @@ public interface SettlementRepository extends JpaRepository<Settlement, Integer>
     List<Settlement> findByEventAndHelper(Event event, User helper);
 
     @Query("SELECT COALESCE(SUM(s.amount), 0) FROM Settlement s WHERE s.event = :event AND s.helper = :helper")
-    Long getTotalSettledByEventAndHelper(@Param("event") Event event, @Param("helper") User helper);
+    Double getTotalSettledByEventAndHelper(@Param("event") Event event, @Param("helper") User helper);
 
     @Query("SELECT COALESCE(SUM(s.amount), 0) FROM Settlement s WHERE s.event = :event")
-    Long getTotalSettledByEvent(@Param("event") Event event);
+    Double getTotalSettledByEvent(@Param("event") Event event);
 }

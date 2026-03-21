@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 public record HisabCreateRequest(
     @NotNull Integer eventId,
     @NotNull Integer guestId,
-    @NotNull Long amount,
+    @NotNull Double amount,
     PaymentMethod paymentMethod
 ) {}
 

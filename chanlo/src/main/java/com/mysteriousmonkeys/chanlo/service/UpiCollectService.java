@@ -45,7 +45,7 @@ public class UpiCollectService {
      * @param amount     Amount in rupees
      * @return The created collect request
      */
-    public UpiCollectRequest initiateCollect(int hisabId, String hostUpiId, String guestUpiId, Long amount) {
+    public UpiCollectRequest initiateCollect(int hisabId, String hostUpiId, String guestUpiId, Double amount) {
         log.info("Initiating UPI collect: hisabId={}, from={} to={}, amount={}",
                 hisabId, guestUpiId, hostUpiId, amount);
 

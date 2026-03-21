@@ -41,4 +41,29 @@ public interface MoneyRepository extends JpaRepository<Hisab, Integer> {
            "CASE WHEN h.paymentStatus = 'SUCCESS' THEN 0 ELSE 1 END, " +
            "COALESCE(h.completedAt, h.createdAt) DESC")
     List<Hisab> findByEventsOrderByStatusAndDate(@Param("events") List<Event> events);
+
+    boolean existsByEventAndGuestAndPaymentStatus(Event event, User guest, PaymentStatus status);
+
+    @Query("SELECT h FROM Hisab h WHERE h.guest = :guest AND h.event.eventType = com.mysteriousmonkeys.chanlo.event.EventType.CAPACITY_EVENT ORDER BY h.createdAt DESC")
+    List<Hisab> findCapacityEventsByGuest(@Param("guest") User guest);
+
+    /**
+     * Find all bookings for an event that overlap with the given stop-order range.
+     * A booking overlaps [fromStop, toStop] if booking.fromStopOrder < toStop AND booking.toStopOrder > fromStop.
+     * Only counts PENDING and SUCCESS bookings (not REFUNDED/FAILED).
+     */
+    @Query("""
+        SELECT h FROM Hisab h
+        WHERE h.event = :event
+          AND h.paymentStatus IN ('PENDING', 'SUCCESS')
+          AND h.fromStopOrder IS NOT NULL
+          AND h.toStopOrder   IS NOT NULL
+          AND h.fromStopOrder < :toStop
+          AND h.toStopOrder   > :fromStop
+        """)
+    List<Hisab> findOverlappingBookings(
+        @Param("event") Event event,
+        @Param("fromStop") int fromStop,
+        @Param("toStop") int toStop
+    );
 }

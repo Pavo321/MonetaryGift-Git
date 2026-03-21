@@ -9,7 +9,7 @@ public record WhatsAppEventSummary(
     int eventId,
     String eventName,
     String eventDate,
-    Long totalAmount,
+    Double totalAmount,
     Long totalGifts,
     List<WhatsAppPaymentSummary> payments
 ) {}

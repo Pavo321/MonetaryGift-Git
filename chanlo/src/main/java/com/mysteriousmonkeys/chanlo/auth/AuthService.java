@@ -124,7 +124,7 @@ public class AuthService {
     /**
      * Register a new user after OTP verification
      */
-    public User registerUser(String sessionToken, String name, String place, String email, String pincode) {
+    public User registerUser(String sessionToken, String name, String place, String email, String pincode, UserRole role) {
         AuthSessionEntity sessionEntity = sessionRepository.findByToken(sessionToken).orElse(null);
         if (sessionEntity == null || sessionEntity.isExpired()) {
             throw new RuntimeException("Invalid or expired session. Please login again.");
@@ -139,8 +139,10 @@ public class AuthService {
             throw new RuntimeException("Phone number already registered.");
         }
 
+        UserRole assignedRole = (role == UserRole.GUEST) ? UserRole.GUEST : UserRole.HOST;
+
         User user = new User(name, place, sessionEntity.getPhoneNumber());
-        user.setRole(UserRole.HOST);
+        user.setRole(assignedRole);
         user.setEmail(email);
         user.setPincode(pincode);
         user = userRepository.save(user);

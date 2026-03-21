@@ -9,7 +9,7 @@ public class UpiCollectRequest {
     private int hisabId;
     private String hostUpiId;
     private String guestUpiId;
-    private Long amount;
+    private Double amount;
     private String collectRequestId;
     private UpiCollectStatus status;
     private LocalDateTime createdAt;
@@ -17,7 +17,7 @@ public class UpiCollectRequest {
 
     public UpiCollectRequest() {}
 
-    public UpiCollectRequest(int hisabId, String hostUpiId, String guestUpiId, Long amount) {
+    public UpiCollectRequest(int hisabId, String hostUpiId, String guestUpiId, Double amount) {
         this.hisabId = hisabId;
         this.hostUpiId = hostUpiId;
         this.guestUpiId = guestUpiId;
@@ -52,11 +52,11 @@ public class UpiCollectRequest {
         this.guestUpiId = guestUpiId;
     }
 
-    public Long getAmount() {
+    public Double getAmount() {
         return amount;
     }
 
-    public void setAmount(Long amount) {
+    public void setAmount(Double amount) {
         this.amount = amount;
     }
 

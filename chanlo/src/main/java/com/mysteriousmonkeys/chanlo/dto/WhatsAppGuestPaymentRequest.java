@@ -12,7 +12,7 @@ public record WhatsAppGuestPaymentRequest(
     @NotNull String guestName,
     String guestVillage,
     @NotNull String guestPhoneNumber,
-    @NotNull Long amount,
+    @NotNull Double amount,
     PaymentMethod paymentMethod
 ) {}
 

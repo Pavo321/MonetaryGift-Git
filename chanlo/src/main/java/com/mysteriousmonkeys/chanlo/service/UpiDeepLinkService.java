@@ -29,7 +29,7 @@ public class UpiDeepLinkService {
      * @param transactionNote Note/description for the payment
      * @return UPI deep link URL
      */
-    public String generateUpiDeepLink(String payeeUpiId, String payeeName, Long amount, String transactionNote) {
+    public String generateUpiDeepLink(String payeeUpiId, String payeeName, Double amount, String transactionNote) {
         try {
             StringBuilder upiLink = new StringBuilder("upi://pay?");
 
@@ -71,7 +71,7 @@ public class UpiDeepLinkService {
      * @return UPI deep link URL
      */
     public String generateGiftPaymentLink(String hostUpiId, String hostName,
-            String eventName, String guestName, Long amount) {
+            String eventName, String guestName, Double amount) {
 
         String transactionNote = String.format("Gift from %s for %s",
                 guestName != null ? guestName : "Guest",
@@ -90,7 +90,7 @@ public class UpiDeepLinkService {
      * @param transactionNote Note for the payment
      * @return HTTP URL that opens UPI apps
      */
-    public String generateUpiIntentUrl(String payeeUpiId, String payeeName, Long amount, String transactionNote) {
+    public String generateUpiIntentUrl(String payeeUpiId, String payeeName, Double amount, String transactionNote) {
         // Some UPI apps respond better to intent:// format
         String upiLink = generateUpiDeepLink(payeeUpiId, payeeName, amount, transactionNote);
         if (upiLink == null) return null;
@@ -107,7 +107,7 @@ public class UpiDeepLinkService {
      * Returns links that directly open specific apps
      */
     public UpiPaymentLinks generateAllPaymentLinks(String payeeUpiId, String payeeName,
-            Long amount, String transactionNote) {
+            Double amount, String transactionNote) {
 
         String baseParams = String.format("pa=%s&pn=%s&am=%d.00&cu=INR&tn=%s",
                 encode(payeeUpiId),

@@ -10,7 +10,7 @@ import jakarta.validation.constraints.NotNull;
 public record WhatsAppCreatePaymentRequest(
     @NotNull String eventQrCode,
     @NotNull String guestPhoneNumber,
-    @NotNull Long amount,
+    @NotNull Double amount,
     PaymentMethod paymentMethod
 ) {}
 

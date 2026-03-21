@@ -11,13 +11,13 @@ import java.util.List;
 
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Integer> {
-    List<Expense> findByEvent(Event event);
+    List<Expense> findByEventOrderByIdDesc(Event event);
     List<Expense> findBySpentBy(User spentBy);
     List<Expense> findByEventAndSpentBy(Event event, User spentBy);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.event = :event AND e.spentBy = :helper")
-    Long getTotalExpenseByEventAndHelper(@Param("event") Event event, @Param("helper") User helper);
+    Double getTotalExpenseByEventAndHelper(@Param("event") Event event, @Param("helper") User helper);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.event = :event")
-    Long getTotalExpenseByEvent(@Param("event") Event event);
+    Double getTotalExpenseByEvent(@Param("event") Event event);
 }

@@ -114,6 +114,15 @@ public class WhatsAppWebhookController {
         }
     }
     
+    /** Send text to bot, only sendTextMessage if bot returns non-empty (interactive already sent by bot) */
+    private void dispatchToBot(String from, String input) {
+        String response = chatbotService.processMessage(from, input);
+        if (response != null && !response.isEmpty()) {
+            boolean sent = whatsAppApiService.sendTextMessage(from, response);
+            if (!sent) log.error("Failed to send response to: {}", from);
+        }
+    }
+
     /**
      * Handle incoming message from WhatsApp
      */
@@ -125,26 +134,26 @@ public class WhatsAppWebhookController {
             
             log.info("Incoming message: from={}, id={}, type={}", from, messageId, messageType);
             
-            // Only process text messages for now
             if ("text".equals(messageType) && message.text() != null) {
                 String text = message.text().body();
                 log.info("Message text: {}", text);
-                
-                // Process message through chatbot
-                String response = chatbotService.processMessage(from, text);
-                
-                // Send response back via WhatsApp API
-                boolean sent = whatsAppApiService.sendTextMessage(from, response);
-                if (sent) {
-                    log.info("Response sent successfully to: {}", from);
-                } else {
-                    log.error("Failed to send response to: {}", from);
+                dispatchToBot(from, text);
+
+            } else if ("interactive".equals(messageType) && message.interactive() != null) {
+                // User tapped a button or selected from a list — extract the button/row ID
+                var interactive = message.interactive();
+                String selectedId = null;
+                if ("button_reply".equals(interactive.type()) && interactive.buttonReply() != null) {
+                    selectedId = interactive.buttonReply().id();
+                } else if ("list_reply".equals(interactive.type()) && interactive.listReply() != null) {
+                    selectedId = interactive.listReply().id();
+                }
+                if (selectedId != null) {
+                    log.info("Interactive reply from {}: id={}", from, selectedId);
+                    dispatchToBot(from, selectedId);
                 }
             } else {
-                log.info("Ignoring non-text message type: {}", messageType);
-                // Send a helpful message for unsupported message types
-                whatsAppApiService.sendTextMessage(from, 
-                    "I can only process text messages. Please send your message as text.");
+                log.info("Ignoring message type: {}", messageType);
             }
             
         } catch (Exception e) {

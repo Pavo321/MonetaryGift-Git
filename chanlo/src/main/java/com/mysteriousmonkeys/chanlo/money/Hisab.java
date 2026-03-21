@@ -41,6 +41,15 @@ public class Hisab {
     
     private String gatewayTransactionId;
     private String gatewayName;
+
+    @Column(name = "from_stop_order")
+    private Integer fromStopOrder;
+
+    @Column(name = "to_stop_order")
+    private Integer toStopOrder;
+
+    @Column(name = "seats_booked")
+    private int seatsBooked = 1;
     
     @CreatedDate
     private LocalDateTime createdAt;
@@ -144,6 +153,15 @@ public class Hisab {
     public void setCollectedBy(User collectedBy) {
         this.collectedBy = collectedBy;
     }
+
+    public Integer getFromStopOrder() { return fromStopOrder; }
+    public void setFromStopOrder(Integer fromStopOrder) { this.fromStopOrder = fromStopOrder; }
+
+    public Integer getToStopOrder() { return toStopOrder; }
+    public void setToStopOrder(Integer toStopOrder) { this.toStopOrder = toStopOrder; }
+
+    public int getSeatsBooked() { return seatsBooked; }
+    public void setSeatsBooked(int seatsBooked) { this.seatsBooked = seatsBooked; }
 
     public String getVerificationQrData() {
         return verificationQrData;

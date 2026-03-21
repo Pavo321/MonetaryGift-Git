@@ -1,9 +1,15 @@
 package com.mysteriousmonkeys.chanlo.dto;
 
+import com.mysteriousmonkeys.chanlo.event.ConfirmationType;
 import com.mysteriousmonkeys.chanlo.event.Event;
+import com.mysteriousmonkeys.chanlo.event.EventRouteStop;
 import com.mysteriousmonkeys.chanlo.event.EventStatus;
+import com.mysteriousmonkeys.chanlo.event.EventType;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.List;
 
 public record EventResponse(
     int eventId,
@@ -13,13 +19,36 @@ public record EventResponse(
     String hostVillage,
     String qrCodeImageUrl,
     EventStatus status,
+    EventType eventType,
+    ConfirmationType confirmationType,
+    Integer capacity,
+    Long pricePerPerson,
+    Long activeParticipants,
     Long totalGiftsReceived,
     Double totalAmount,
     Double cashAmount,
-    Double upiAmount
+    Double upiAmount,
+    String location,
+    String category,
+    String deepLinkUrl,
+    LocalTime eventTime,
+    List<RouteStopResponse> routeStops,
+    Float totalDistanceKm
 ) {
     public static EventResponse from(Event event, Double totalAmount, Long giftCount,
-                                     Double cashAmount, Double upiAmount) {
+                                     Long activeParticipants, Double cashAmount, Double upiAmount) {
+        List<RouteStopResponse> stops = event.getRouteStops() == null ? List.of() :
+            event.getRouteStops().stream()
+                .sorted(Comparator.comparingInt(EventRouteStop::getStopOrder))
+                .map(s -> new RouteStopResponse(
+                    s.getStopOrder(),
+                    s.getStopName(),
+                    s.getLat() != null ? s.getLat() : 0.0,
+                    s.getLng() != null ? s.getLng() : 0.0,
+                    s.getDistanceToNextKm()
+                ))
+                .toList();
+
         return new EventResponse(
             event.getEventId(),
             event.getEventName(),
@@ -28,10 +57,27 @@ public record EventResponse(
             event.getHost().getVillage(),
             event.getQrCodeImageUrl(),
             event.getStatus(),
+            event.getEventType(),
+            event.getConfirmationType(),
+            event.getCapacity(),
+            event.getPricePerPerson(),
+            activeParticipants,
             giftCount,
             totalAmount,
             cashAmount,
-            upiAmount
+            upiAmount,
+            event.getLocation(),
+            event.getCategory(),
+            "mahotsava://event/" + event.getEventId(),
+            event.getEventTime(),
+            stops,
+            event.getTotalDistanceKm()
         );
+    }
+
+    // backward-compatible factory for callers that don't have participant count
+    public static EventResponse from(Event event, Double totalAmount, Long giftCount,
+                                     Double cashAmount, Double upiAmount) {
+        return from(event, totalAmount, giftCount, 0L, cashAmount, upiAmount);
     }
 }

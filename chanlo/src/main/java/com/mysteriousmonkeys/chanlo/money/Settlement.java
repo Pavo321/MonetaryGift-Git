@@ -31,7 +31,7 @@ public class Settlement {
 
     @NotNull
     @Positive
-    private Long amount;
+    private Double amount;
 
     private String note;
 
@@ -40,7 +40,7 @@ public class Settlement {
 
     public Settlement() {}
 
-    public Settlement(Event event, User helper, User host, Long amount, String note) {
+    public Settlement(Event event, User helper, User host, Double amount, String note) {
         this.event = event;
         this.helper = helper;
         this.host = host;
@@ -61,8 +61,8 @@ public class Settlement {
     public User getHost() { return host; }
     public void setHost(User host) { this.host = host; }
 
-    public Long getAmount() { return amount; }
-    public void setAmount(Long amount) { this.amount = amount; }
+    public Double getAmount() { return amount; }
+    public void setAmount(Double amount) { this.amount = amount; }
 
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }

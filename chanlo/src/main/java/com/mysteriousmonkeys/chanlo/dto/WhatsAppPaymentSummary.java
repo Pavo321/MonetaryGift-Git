@@ -8,13 +8,13 @@ import java.time.LocalDateTime;
  */
 public record WhatsAppPaymentSummary(
     String guestName,
-    Long amount,
+    Double amount,
     String village,
     String paymentStatus,
     LocalDateTime createdAt,
     LocalDateTime completedAt
 ) {
-    public static WhatsAppPaymentSummary from(String guestName, Long amount, String village,
+    public static WhatsAppPaymentSummary from(String guestName, Double amount, String village,
             String paymentStatus, LocalDateTime createdAt, LocalDateTime completedAt) {
         return new WhatsAppPaymentSummary(guestName, amount, village, paymentStatus, createdAt, completedAt);
     }

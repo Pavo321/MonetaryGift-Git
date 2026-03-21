@@ -69,7 +69,7 @@ public class HisabService {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
         
-        return moneyRepository.findByEvent(event)
+        return moneyRepository.findByEventOrderByHisabIdDesc(event)
             .stream()
             .map(HisabResponse::from)
             .toList();
@@ -121,7 +121,7 @@ public class HisabService {
         Event event = eventRepository.findById(eventId)
             .orElseThrow(() -> new EventNotFoundException("Event not found"));
 
-        return moneyRepository.findByEvent(event)
+        return moneyRepository.findByEventOrderByHisabIdDesc(event)
             .stream()
             .map(hisab -> com.mysteriousmonkeys.chanlo.dto.WhatsAppPaymentSummary.from(
                 hisab.getGuest().getName(),
@@ -161,12 +161,12 @@ public class HisabService {
             String guestPhone = guest.getPhoneNumber();
             String thankYouMessage = event.getThankYouMessage();
             String hostName = event.getHost().getName();
-            Long amount = hisab.getAmount();
+            Double amount = hisab.getAmount();
 
             // Compose thank you message
             String message = String.format(
                 "Payment Received!\n\n" +
-                "Thank you %s for your generous gift of Rs. %d for %s.\n\n" +
+                "Thank you %s for your generous gift of Rs. %.2f for %s.\n\n" +
                 "Message from %s:\n\"%s\"\n\n" +
                 "Transaction ID: %s",
                 guest.getName(),

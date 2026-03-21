@@ -10,7 +10,7 @@ public record HisabResponse(
     String guestName,
     String guestVillage,
     String eventName,
-    Long amount,
+    Double amount,
     PaymentStatus status,
     LocalDateTime createdAt,
     LocalDateTime completedAt

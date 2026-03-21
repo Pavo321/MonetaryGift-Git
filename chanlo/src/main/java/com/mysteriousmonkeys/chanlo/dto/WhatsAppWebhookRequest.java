@@ -56,12 +56,26 @@ public record WhatsAppWebhookRequest(
         @JsonProperty("id") String id,
         @JsonProperty("timestamp") String timestamp,
         @JsonProperty("text") Text text,
-        @JsonProperty("type") String type
+        @JsonProperty("type") String type,
+        @JsonProperty("interactive") Interactive interactive
     ) {}
-    
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Text(
         @JsonProperty("body") String body
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Interactive(
+        @JsonProperty("type") String type,
+        @JsonProperty("button_reply") InteractiveReply buttonReply,
+        @JsonProperty("list_reply") InteractiveReply listReply
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record InteractiveReply(
+        @JsonProperty("id") String id,
+        @JsonProperty("title") String title
     ) {}
     
     @JsonIgnoreProperties(ignoreUnknown = true)

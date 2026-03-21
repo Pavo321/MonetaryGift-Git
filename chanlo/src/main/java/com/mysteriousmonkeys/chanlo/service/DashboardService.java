@@ -34,7 +34,7 @@ public class DashboardService {
     }
 
     public DashboardResponse getDashboardForHost(User host) {
-        List<Event> hostEvents = eventRepository.findByHost(host);
+        List<Event> hostEvents = eventRepository.findByHostOrderByEventIdDesc(host);
 
         if (hostEvents.isEmpty()) {
             return DashboardResponse.create(host.getName(), List.of());

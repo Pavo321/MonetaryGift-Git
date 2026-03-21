@@ -33,7 +33,7 @@ public class Expense {
 
     @NotNull
     @Positive
-    private Long amount;
+    private Double amount;
 
     @CreatedDate
     @Column(name = "created_at")
@@ -41,7 +41,7 @@ public class Expense {
 
     public Expense() {}
 
-    public Expense(Event event, User spentBy, String reason, Long amount) {
+    public Expense(Event event, User spentBy, String reason, Double amount) {
         this.event = event;
         this.spentBy = spentBy;
         this.reason = reason;
@@ -60,8 +60,8 @@ public class Expense {
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
 
-    public Long getAmount() { return amount; }
-    public void setAmount(Long amount) { this.amount = amount; }
+    public Double getAmount() { return amount; }
+    public void setAmount(Double amount) { this.amount = amount; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

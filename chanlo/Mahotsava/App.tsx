@@ -29,6 +29,12 @@ import HostCollectScreen from './src/screens/host/HostCollectScreen';
 import HelperDashboardScreen from './src/screens/helper/HelperDashboardScreen';
 import HelperEventScreen from './src/screens/helper/HelperEventScreen';
 
+// Guest screens
+import GuestDashboardScreen from './src/screens/guest/GuestDashboardScreen';
+import JoinEventScreen from './src/screens/guest/JoinEventScreen';
+import JoinEventPaymentScreen from './src/screens/guest/JoinEventPaymentScreen';
+import BrowseEventsScreen from './src/screens/guest/BrowseEventsScreen';
+
 // Common screens
 import ProfileScreen from './src/screens/common/ProfileScreen';
 import VerifyScreen from './src/screens/common/VerifyScreen';
@@ -37,6 +43,15 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const TAB_HEIGHT = Platform.OS === 'ios' ? 84 : 64;
+
+const linking = {
+  prefixes: ['mahotsava://'],
+  config: {
+    screens: {
+      JoinEvent: 'event/:eventId',
+    },
+  },
+};
 
 // Host bottom tabs
 function HostTabs() {
@@ -82,6 +97,58 @@ function HostTabs() {
       />
       <Tab.Screen
         name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+// Guest bottom tabs
+function GuestTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: colors.info,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopWidth: 0,
+          height: TAB_HEIGHT,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          paddingTop: 8,
+          ...shadows.md,
+        },
+        tabBarLabelStyle: {fontSize: 11, fontWeight: '700', marginTop: 2},
+        headerShown: false,
+      }}>
+      <Tab.Screen
+        name="GuestDashboard"
+        component={GuestDashboardScreen}
+        options={{
+          tabBarLabel: 'My Events',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Browse"
+        component={BrowseEventsScreen}
+        options={{
+          tabBarLabel: 'Browse',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="GuestProfile"
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
@@ -180,6 +247,8 @@ function App() {
           // Route based on user role
           if (res.role === 'HELPER') {
             setInitialRoute('HelperTabs');
+          } else if (res.role === 'GUEST') {
+            setInitialRoute('GuestTabs');
           } else {
             setInitialRoute('HostTabs');
           }
@@ -206,7 +275,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={navigationRef} linking={linking}>
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{
@@ -228,6 +297,11 @@ function App() {
           {/* Helper flow */}
           <Stack.Screen name="HelperTabs" component={HelperTabs} />
           <Stack.Screen name="HelperEvent" component={HelperEventScreen} />
+
+          {/* Guest flow */}
+          <Stack.Screen name="GuestTabs" component={GuestTabs} />
+          <Stack.Screen name="JoinEvent" component={JoinEventScreen} />
+          <Stack.Screen name="JoinEventPayment" component={JoinEventPaymentScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
