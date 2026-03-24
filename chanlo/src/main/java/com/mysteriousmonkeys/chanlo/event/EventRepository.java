@@ -20,10 +20,13 @@ public interface EventRepository extends JpaRepository<Event, Integer> {
     List<Event> findByEventDateBetween(LocalDate start, LocalDate end);
     boolean existsByHostAndEventNameAndEventDate(User host, String eventName, LocalDate eventDate);
 
+    List<Event> findByIsPublicTrueAndLatIsNotNullAndDeletedAtIsNull();
+
     @Query("""
         SELECT e FROM Event e
         WHERE e.eventType = 'CAPACITY_EVENT'
           AND e.status = 'ACTIVE'
+          AND e.isPublic = TRUE
           AND (:name     IS NULL OR LOWER(e.eventName) LIKE LOWER(CONCAT('%', :name, '%')))
           AND (:location IS NULL OR LOWER(e.location)  LIKE LOWER(CONCAT('%', :location, '%'))
                OR EXISTS (

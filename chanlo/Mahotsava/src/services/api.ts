@@ -249,11 +249,18 @@ class ApiService {
     eventTime?: string,
     routeStops?: RouteStopInput[],
     totalDistanceKm?: number,
+    isPublic?: boolean,
+    lat?: number,
+    lng?: number,
   ) {
     return this.request('/api/app/events', {
       method: 'POST',
-      body: JSON.stringify({eventName, eventDate, hostMessage, eventType, confirmationType, capacity, pricePerPerson, location, category, eventTime, routeStops, totalDistanceKm}),
+      body: JSON.stringify({eventName, eventDate, hostMessage, eventType, confirmationType, capacity, pricePerPerson, location, category, eventTime, routeStops, totalDistanceKm, isPublic, lat, lng}),
     });
+  }
+
+  async exploreEvents() {
+    return this.request('/api/app/events/explore');
   }
 
   async getMyEvents() {

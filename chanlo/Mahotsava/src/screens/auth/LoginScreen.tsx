@@ -80,8 +80,8 @@ export default function LoginScreen({navigation}: any) {
               />
             </View>
             <ModeButton
-              icon="ticket-outline"
-              label="Join an Event"
+              icon="map-outline"
+              label="Explore Surrounding"
               active={mode === 'guest'}
               onPress={() => setMode('guest')}
               fullWidth
@@ -117,7 +117,7 @@ export default function LoginScreen({navigation}: any) {
 
         <Animated.Text entering={FadeInUp.duration(600).delay(400)} style={styles.footer}>
           {mode === 'guest'
-            ? 'Browse & join events near you'
+            ? 'Discover public events on the map'
             : 'Hosts & Helpers manage events here'}
         </Animated.Text>
       </KeyboardAvoidingView>

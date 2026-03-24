@@ -222,21 +222,18 @@ export default function CollectScreen({route}: any) {
         {/* Payment method */}
         <Text style={styles.label}>Payment Method</Text>
         <View style={styles.methodRow}>
-          {(['CASH', 'UPI_QR'] as const).map(m => (
-            <TouchableOpacity
-              key={m}
-              style={[styles.methodBtn, method === m && styles.methodBtnActive]}
-              onPress={() => setMethod(m)}>
-              <Ionicons
-                name={m === 'CASH' ? 'cash-outline' : 'card-outline'}
-                size={18}
-                color={method === m ? colors.secondary : colors.textSecondary}
-              />
-              <Text style={[styles.methodText, method === m && styles.methodTextActive]}>
-                {m === 'CASH' ? 'Cash' : 'UPI'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            style={[styles.methodBtn, method === 'CASH' && styles.methodBtnActive]}
+            onPress={() => setMethod('CASH')}>
+            <Ionicons name="cash-outline" size={18} color={method === 'CASH' ? colors.secondary : colors.textSecondary} />
+            <Text style={[styles.methodText, method === 'CASH' && styles.methodTextActive]}>Cash</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.methodBtn, styles.methodBtnDisabled]}
+            onPress={() => Alert.alert('Coming Soon', 'UPI payments will be available in a future update. Please use Cash for now.')}>
+            <Ionicons name="card-outline" size={18} color={colors.textMuted} />
+            <Text style={[styles.methodText, {color: colors.textMuted}]}>UPI</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -323,6 +320,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
   },
   methodBtnActive: {borderColor: colors.secondary, backgroundColor: '#E0F2F1'},
+  methodBtnDisabled: {opacity: 0.5},
   methodText: {fontSize: fontSize.md, fontWeight: '600', color: colors.textSecondary},
   methodTextActive: {color: colors.secondary},
   scanBtn: {marginBottom: spacing.sm},

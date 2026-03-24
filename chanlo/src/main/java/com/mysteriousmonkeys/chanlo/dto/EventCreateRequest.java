@@ -24,5 +24,8 @@ public record EventCreateRequest(
     @NotBlank String category,         // required: TRAVEL, MUSIC, SPORT, FOOD, SOCIAL, OTHER
     LocalTime eventTime,               // optional approximate start time
     List<RouteStopInput> routeStops,   // ordered stops with lat/lng/distance (TRAVEL only)
-    Float totalDistanceKm              // total route distance in km (TRAVEL only)
+    Float totalDistanceKm,             // total route distance in km (TRAVEL only)
+    Boolean isPublic,                  // if true, event appears on Explore map
+    Double lat,                        // event pin latitude (required when isPublic=true)
+    Double lng                         // event pin longitude (required when isPublic=true)
 ) {}

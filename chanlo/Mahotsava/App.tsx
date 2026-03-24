@@ -38,7 +38,7 @@ import HelperEventScreen from './src/screens/helper/HelperEventScreen';
 import GuestDashboardScreen from './src/screens/guest/GuestDashboardScreen';
 import JoinEventScreen from './src/screens/guest/JoinEventScreen';
 import JoinEventPaymentScreen from './src/screens/guest/JoinEventPaymentScreen';
-import BrowseEventsScreen from './src/screens/guest/BrowseEventsScreen';
+import ExploreMapScreen from './src/screens/guest/ExploreMapScreen';
 
 // Common screens
 import ProfileScreen from './src/screens/common/ProfileScreen';
@@ -163,12 +163,12 @@ function GuestTabs() {
         }}
       />
       <Tab.Screen
-        name="Browse"
-        component={BrowseEventsScreen}
+        name="Explore"
+        component={ExploreMapScreen}
         options={{
-          tabBarLabel: 'Browse',
+          tabBarLabel: 'Explore',
           tabBarIcon: ({color, focused}) => (
-            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'map' : 'map-outline'} size={24} color={color} />
           ),
         }}
       />

@@ -33,7 +33,10 @@ public record EventResponse(
     String deepLinkUrl,
     LocalTime eventTime,
     List<RouteStopResponse> routeStops,
-    Float totalDistanceKm
+    Float totalDistanceKm,
+    boolean isPublic,
+    Double lat,
+    Double lng
 ) {
     public static EventResponse from(Event event, Double totalAmount, Long giftCount,
                                      Long activeParticipants, Double cashAmount, Double upiAmount) {
@@ -71,7 +74,10 @@ public record EventResponse(
             "mahotsava://event/" + event.getEventId(),
             event.getEventTime(),
             stops,
-            event.getTotalDistanceKm()
+            event.getTotalDistanceKm(),
+            event.isPublic(),
+            event.getLat(),
+            event.getLng()
         );
     }
 

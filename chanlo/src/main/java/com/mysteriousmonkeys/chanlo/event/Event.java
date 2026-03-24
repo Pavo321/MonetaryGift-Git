@@ -80,6 +80,15 @@ public class Event {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "is_public")
+    private boolean isPublic = false;
+
+    @Column(name = "lat")
+    private Double lat;
+
+    @Column(name = "lng")
+    private Double lng;
+
 
 
     public Event() {
@@ -189,6 +198,30 @@ public class Event {
 
     public boolean isDeleted() {
         return deletedAt != null;
+    }
+
+    public boolean isPublic() {
+        return isPublic;
+    }
+
+    public void setPublic(boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+
+    public Double getLat() {
+        return lat;
+    }
+
+    public void setLat(Double lat) {
+        this.lat = lat;
+    }
+
+    public Double getLng() {
+        return lng;
+    }
+
+    public void setLng(Double lng) {
+        this.lng = lng;
     }
 
     public boolean isCapacityBased() {

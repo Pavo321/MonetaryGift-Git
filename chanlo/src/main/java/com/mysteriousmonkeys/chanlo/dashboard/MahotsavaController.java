@@ -883,6 +883,36 @@ public class MahotsavaController {
         }
     }
 
+    /**
+     * Explore public events on map (no auth required).
+     * GET /api/app/events/explore
+     * Returns public events with lat/lng for map pins.
+     */
+    @GetMapping("/events/explore")
+    public ResponseEntity<?> exploreEvents() {
+        try {
+            List<com.mysteriousmonkeys.chanlo.event.Event> events =
+                eventRepository.findByIsPublicTrueAndLatIsNotNullAndDeletedAtIsNull();
+            List<Map<String, Object>> result = events.stream().map(e -> {
+                Map<String, Object> m = new java.util.HashMap<>();
+                m.put("eventId", e.getEventId());
+                m.put("eventName", e.getEventName());
+                m.put("eventDate", e.getEventDate());
+                m.put("category", e.getCategory());
+                m.put("eventType", e.getEventType());
+                m.put("location", e.getLocation());
+                m.put("hostName", e.getHost().getName());
+                m.put("status", e.getStatus());
+                m.put("lat", e.getLat());
+                m.put("lng", e.getLng());
+                return m;
+            }).toList();
+            return ResponseEntity.ok(Map.of("success", true, "events", result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     // ==================== PROFILE ====================
 
     /**

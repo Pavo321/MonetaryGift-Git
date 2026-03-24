@@ -84,6 +84,11 @@ export default function CreateEventScreen({navigation}: any) {
   const [location, setLocation] = useState('');
   const [category, setCategory] = useState<CategoryOption | ''>('');
 
+  // Visibility
+  const [isPublic, setIsPublic] = useState(false);
+  const [eventLat, setEventLat] = useState<number | null>(null);
+  const [eventLng, setEventLng] = useState<number | null>(null);
+
   // Route (TRAVEL only)
   const [routeStops, setRouteStops] = useState<RouteStopInput[]>([]);
   const [routePolyline, setRoutePolyline] = useState<{latitude: number; longitude: number}[]>([]);
@@ -285,6 +290,9 @@ export default function CreateEventScreen({navigation}: any) {
         eventTime ? formatTimeForApi(eventTime) : undefined,
         isCapacity && isTravel && routeStops.length >= 2 ? routeStops : undefined,
         isCapacity && isTravel && totalDistanceKm > 0 ? totalDistanceKm : undefined,
+        isPublic,
+        isPublic && eventLat != null ? eventLat : undefined,
+        isPublic && eventLng != null ? eventLng : undefined,
       );
       if (res.success) {
         const typeLabel = isCapacity ? (confirmationType === 'AUTO' ? 'Carpool/Auto' : 'Ticketed') : 'Gift Collection';
@@ -337,6 +345,10 @@ export default function CreateEventScreen({navigation}: any) {
     if (eventNameError) { Alert.alert('Invalid Event Name', eventNameError); return; }
     if (!eventDate) { Alert.alert('Required', 'Please select the event date'); return; }
     if (!category) { Alert.alert('Required', 'Please select a category'); return; }
+    if (isPublic && (eventLat == null || eventLng == null)) {
+      Alert.alert('Location Required', 'Public events need a map location so they appear on the Explore map. Tap the map to place a pin.');
+      return;
+    }
     if (isCapacity) {
       if (!capacity || parseInt(capacity) < 1) {
         Alert.alert('Required', 'Please enter a valid capacity (minimum 1)');
@@ -660,6 +672,49 @@ export default function CreateEventScreen({navigation}: any) {
             </>
           )}
 
+          {/* Visibility toggle */}
+          <Text style={styles.label}>Event Visibility</Text>
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, !isPublic && styles.toggleBtnActive]}
+              onPress={() => setIsPublic(false)}>
+              <Ionicons name="lock-closed-outline" size={16} color={!isPublic ? '#fff' : colors.textSecondary} />
+              <Text style={[styles.toggleBtnText, !isPublic && styles.toggleBtnTextActive]}>Private</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, isPublic && styles.toggleBtnActivePublic]}
+              onPress={() => setIsPublic(true)}>
+              <Ionicons name="earth-outline" size={16} color={isPublic ? '#fff' : colors.textSecondary} />
+              <Text style={[styles.toggleBtnText, isPublic && styles.toggleBtnTextActive]}>Public</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.visibilityHint}>
+            {isPublic
+              ? 'This event will appear as a pin on the Explore map.'
+              : 'Only accessible via QR code or link.'}
+          </Text>
+
+          {isPublic && (
+            <View style={styles.mapPickerContainer}>
+              <Text style={styles.mapPickerLabel}>
+                <Ionicons name="location-outline" size={13} color={colors.primary} />
+                {' '}Tap the map to place your event pin{eventLat != null ? ' ✓' : ''}
+              </Text>
+              <MapView
+                style={styles.mapPicker}
+                initialRegion={{latitude: 20.5937, longitude: 78.9629, latitudeDelta: 15, longitudeDelta: 15}}
+                onPress={e => {
+                  const {latitude, longitude} = e.nativeEvent.coordinate;
+                  setEventLat(latitude);
+                  setEventLng(longitude);
+                }}>
+                {eventLat != null && eventLng != null && (
+                  <Marker coordinate={{latitude: eventLat, longitude: eventLng}} pinColor={colors.primary} />
+                )}
+              </MapView>
+            </View>
+          )}
+
           <Text style={styles.label}>{isCapacity ? 'Confirmation Message' : 'Thank You Message'}</Text>
           <TextInput
             style={[styles.input, styles.multiline]}
@@ -845,4 +900,25 @@ const styles = StyleSheet.create({
   stopRemoveBtn: {padding: 2},
   fetchingRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm},
   fetchingText: {fontSize: fontSize.sm, color: colors.textMuted, fontStyle: 'italic'},
+  toggleRow: {flexDirection: 'row', gap: spacing.sm, marginTop: 4},
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  toggleBtnActive: {backgroundColor: colors.textSecondary, borderColor: colors.textSecondary},
+  toggleBtnActivePublic: {backgroundColor: colors.primary, borderColor: colors.primary},
+  toggleBtnText: {fontSize: fontSize.sm, fontWeight: '600', color: colors.textSecondary},
+  toggleBtnTextActive: {color: '#fff'},
+  visibilityHint: {fontSize: fontSize.xs, color: colors.textMuted, marginTop: 6, marginBottom: spacing.xs},
+  mapPickerContainer: {marginTop: spacing.xs, marginBottom: spacing.sm},
+  mapPickerLabel: {fontSize: fontSize.xs, color: colors.primary, fontWeight: '600', marginBottom: spacing.xs},
+  mapPicker: {width: '100%', height: 180, borderRadius: borderRadius.md, overflow: 'hidden'},
 });

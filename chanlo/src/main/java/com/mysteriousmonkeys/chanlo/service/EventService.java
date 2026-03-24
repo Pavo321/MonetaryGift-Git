@@ -111,6 +111,11 @@ public class EventService {
         if (request.location() != null) event.setLocation(request.location());
         if (request.category() != null) event.setCategory(request.category());
         if (request.eventTime() != null) event.setEventTime(request.eventTime());
+        if (Boolean.TRUE.equals(request.isPublic())) {
+            event.setPublic(true);
+            if (request.lat() != null) event.setLat(request.lat());
+            if (request.lng() != null) event.setLng(request.lng());
+        }
 
         Event savedEvent = eventRepository.save(event);
 
