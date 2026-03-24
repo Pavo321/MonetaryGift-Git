@@ -926,6 +926,22 @@ public class MahotsavaController {
         return ResponseEntity.ok(Map.of("success", true, "user", user));
     }
 
+    /**
+     * Delete account (soft delete — recoverable within 30 days by logging back in)
+     * DELETE /api/app/account
+     */
+    @DeleteMapping("/account")
+    public ResponseEntity<?> deleteAccount(@RequestHeader("Authorization") String authHeader) {
+        AuthService.AuthSession session = validateAuth(authHeader);
+        if (session == null) return unauthorized();
+        try {
+            authService.deleteAccount(session.userId());
+            return ResponseEntity.ok(Map.of("success", true, "message", "Account deleted"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     // ==================== HELPERS ====================
 
     private AuthService.AuthSession validateAuth(String authHeader) {

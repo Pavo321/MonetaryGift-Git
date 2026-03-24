@@ -89,6 +89,43 @@ export default function ProfileScreen({navigation}: any) {
     ]);
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account?\n\nAll your data will be deactivated. You can recover it by logging back in within 30 days.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Final Confirmation',
+              'This will delete your account and log you out immediately. Continue?',
+              [
+                {text: 'Go Back', style: 'cancel'},
+                {
+                  text: 'Yes, Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await api.deleteAccount();
+                    } catch {}
+                    await api.clearToken();
+                    navigation.reset({
+                      index: 0,
+                      routes: [{name: 'Login'}],
+                    });
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -182,6 +219,13 @@ export default function ProfileScreen({navigation}: any) {
         onPress={handleLogout}
         style={styles.logoutBtn}
       />
+      <IconButton
+        icon="trash-outline"
+        label="Delete Account"
+        variant="outline"
+        onPress={handleDeleteAccount}
+        style={styles.deleteBtn}
+      />
     </ScrollView>
   );
 }
@@ -221,4 +265,5 @@ const styles = StyleSheet.create({
   input: {borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md - 2, fontSize: fontSize.md, color: colors.textPrimary},
   saveBtn: {marginTop: spacing.lg},
   logoutBtn: {marginTop: spacing.lg},
+  deleteBtn: {marginTop: spacing.sm, borderColor: colors.error ?? '#D32F2F'},
 });

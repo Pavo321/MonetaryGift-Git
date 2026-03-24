@@ -384,6 +384,10 @@ class ApiService {
     return this.mutate('/api/app/profile', 'PUT', data);
   }
 
+  async deleteAccount() {
+    return this.request('/api/app/account', {method: 'DELETE'});
+  }
+
   // Capacity Events — Host actions
   async confirmEvent(eventId: number) {
     return this.request(`/api/app/events/${eventId}/confirm`, {method: 'POST'});

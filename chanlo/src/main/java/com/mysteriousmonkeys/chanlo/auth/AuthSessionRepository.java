@@ -7,4 +7,5 @@ import java.util.Optional;
 public interface AuthSessionRepository extends JpaRepository<AuthSessionEntity, Long> {
     Optional<AuthSessionEntity> findByToken(String token);
     void deleteByToken(String token);
+    void deleteByUserId(Integer userId);
 }

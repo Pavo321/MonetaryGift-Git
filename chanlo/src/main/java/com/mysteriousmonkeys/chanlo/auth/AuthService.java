@@ -102,6 +102,24 @@ public class AuthService {
         // Check if user exists
         Optional<User> userOpt = userRepository.findByPhoneNumber(phoneNumber);
 
+        // Handle soft-deleted users
+        if (userOpt.isPresent() && !userOpt.get().isActive()) {
+            User deletedUser = userOpt.get();
+            long daysSince = deletedUser.getDeletedAt() != null
+                ? java.time.temporal.ChronoUnit.DAYS.between(deletedUser.getDeletedAt(), LocalDateTime.now())
+                : 31;
+            if (daysSince <= 30) {
+                // Auto-restore: logging back in means they want their account back
+                deletedUser.setActive(true);
+                deletedUser.setDeletedAt(null);
+                userRepository.save(deletedUser);
+                log.info("Account auto-restored for {} ({} days after deletion)", phoneNumber, daysSince);
+            } else {
+                return new VerifyOtpResponse(false,
+                    "This account was permanently deleted. Please register again.", null, null);
+            }
+        }
+
         // Generate session token and persist to database
         String sessionToken = UUID.randomUUID().toString();
         AuthSessionEntity sessionEntity = new AuthSessionEntity(
@@ -178,6 +196,19 @@ public class AuthService {
      */
     public void logout(String sessionToken) {
         sessionRepository.deleteByToken(sessionToken);
+    }
+
+    /**
+     * Soft-delete account and invalidate all sessions
+     */
+    public void deleteAccount(int userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setActive(false);
+        user.setDeletedAt(LocalDateTime.now());
+        userRepository.save(user);
+        sessionRepository.deleteByUserId(userId);
+        log.info("Account soft-deleted for userId={}", userId);
     }
 
     private String generateOtp() {
