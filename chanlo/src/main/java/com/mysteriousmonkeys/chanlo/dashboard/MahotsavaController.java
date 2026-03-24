@@ -342,6 +342,42 @@ public class MahotsavaController {
         return ResponseEntity.ok(result);
     }
 
+    // ==================== ANALYTICS ENDPOINTS ====================
+
+    /**
+     * Host analytics: search payments across all events with optional filters
+     * GET /api/app/analytics/payments
+     */
+    @GetMapping("/analytics/payments")
+    public ResponseEntity<?> getAnalyticsPayments(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) Integer eventId,
+            @RequestParam(required = false) String guestName,
+            @RequestParam(required = false) String guestPlace,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate) {
+
+        AuthService.AuthSession session = validateAuth(authHeader);
+        if (session == null) return unauthorized();
+
+        com.mysteriousmonkeys.chanlo.user.User host = userRepository.findById(session.userId()).orElse(null);
+        if (host == null) return unauthorized();
+
+        com.mysteriousmonkeys.chanlo.money.PaymentStatus paymentStatus = null;
+        if (status != null && !status.isBlank()) {
+            try { paymentStatus = com.mysteriousmonkeys.chanlo.money.PaymentStatus.valueOf(status); }
+            catch (IllegalArgumentException ignored) {}
+        }
+        java.time.LocalDate from = fromDate != null && !fromDate.isBlank() ? java.time.LocalDate.parse(fromDate) : null;
+        java.time.LocalDate to = toDate != null && !toDate.isBlank() ? java.time.LocalDate.parse(toDate) : null;
+
+        java.util.List<com.mysteriousmonkeys.chanlo.dto.HisabResponse> payments =
+            hisabService.getPaymentsForHostFiltered(host, eventId, guestName, guestPlace, paymentStatus, from, to);
+
+        return ResponseEntity.ok(Map.of("success", true, "payments", payments));
+    }
+
     // ==================== HELPER ENDPOINTS ====================
 
     /**

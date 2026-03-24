@@ -17,6 +17,11 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import OtpScreen from './src/screens/auth/OtpScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 
+// Analytics screens
+import HostAnalyticsScreen from './src/screens/host/HostAnalyticsScreen';
+import HelperAnalyticsScreen from './src/screens/helper/HelperAnalyticsScreen';
+import GuestAnalyticsScreen from './src/screens/guest/GuestAnalyticsScreen';
+
 // Host screens
 import DashboardScreen from './src/screens/host/DashboardScreen';
 import CreateEventScreen from './src/screens/host/CreateEventScreen';
@@ -86,6 +91,16 @@ function HostTabs() {
         }}
       />
       <Tab.Screen
+        name="HostAnalytics"
+        component={HostAnalyticsScreen}
+        options={{
+          tabBarLabel: 'Analytics',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Verify"
         component={VerifyScreen}
         options={{
@@ -134,6 +149,16 @@ function GuestTabs() {
           tabBarLabel: 'My Events',
           tabBarIcon: ({color, focused}) => (
             <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="GuestAnalytics"
+        component={GuestAnalyticsScreen}
+        options={{
+          tabBarLabel: 'Analytics',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -190,6 +215,16 @@ function HelperTabs() {
           tabBarLabel: 'Events',
           tabBarIcon: ({color, focused}) => (
             <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="HelperAnalytics"
+        component={HelperAnalyticsScreen}
+        options={{
+          tabBarLabel: 'Analytics',
+          tabBarIcon: ({color, focused}) => (
+            <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={24} color={color} />
           ),
         }}
       />

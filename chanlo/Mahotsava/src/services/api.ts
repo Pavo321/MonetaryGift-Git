@@ -336,6 +336,26 @@ class ApiService {
     return this.mutate('/api/app/verify', 'POST', {qrData});
   }
 
+  // Analytics: get payments across all host events with filters
+  async getAnalyticsPayments(params: {
+    eventId?: number;
+    guestName?: string;
+    guestPlace?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+  } = {}) {
+    const query = new URLSearchParams();
+    if (params.eventId != null) query.set('eventId', String(params.eventId));
+    if (params.guestName) query.set('guestName', params.guestName);
+    if (params.guestPlace) query.set('guestPlace', params.guestPlace);
+    if (params.status) query.set('status', params.status);
+    if (params.fromDate) query.set('fromDate', params.fromDate);
+    if (params.toDate) query.set('toDate', params.toDate);
+    const qs = query.toString();
+    return this.get(`/api/app/analytics/payments${qs ? '?' + qs : ''}`);
+  }
+
   // Helper: get assigned events
   async getHelperEvents() {
     return this.get('/api/app/helper/events');

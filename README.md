@@ -13,12 +13,14 @@ A full-stack platform for managing monetary gifts at Indian events (weddings, ce
 - Accept gifts directly from in-person guests
 - View per-helper summaries (cash collected, UPI collected, amount to hand back)
 - Transaction history and guest records
+- **Analytics dashboard** — bar/pie charts, cross-event payment search with filters (guest name, place, event, date range, status)
 
 ### Helper (Mobile App)
 - Collect gifts from guests by scanning their QR code
 - Record cash or UPI payments
 - Track expenses (only cash balance can be spent; UPI goes directly to host)
 - View collection summary per event
+- **Analytics dashboard** — Cash vs UPI split chart, per-event breakdown, event filter
 
 ### Guest (WhatsApp Chatbot)
 - Register via WhatsApp (name, place)
@@ -27,6 +29,7 @@ A full-stack platform for managing monetary gifts at Indian events (weddings, ce
 - Edit personal details
 - View transaction history
 - All interactions through a guided chatbot menu
+- **Analytics dashboard** — payment status chart, amount per event, filters by event/date/status
 
 ---
 
@@ -37,6 +40,7 @@ A full-stack platform for managing monetary gifts at Indian events (weddings, ce
 | Backend | Java 17, Spring Boot 3, Hibernate, Flyway |
 | Database | MySQL |
 | Mobile App | React Native (TypeScript) |
+| Charts | react-native-chart-kit + react-native-svg |
 | WhatsApp | WhatsApp Cloud API (Meta Business) |
 | Auth | JWT |
 | Build | Maven |

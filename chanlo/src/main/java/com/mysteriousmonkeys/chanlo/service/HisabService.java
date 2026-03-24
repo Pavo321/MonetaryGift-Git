@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -201,6 +202,30 @@ public class HisabService {
         User guest = userRepository.findById(guestId)
             .orElseThrow(() -> new UserNotFoundException("Guest not found"));
         return moneyRepository.findByEventAndGuest(event, guest);
+    }
+
+    /**
+     * Get payments for a host across all events with optional filters (for analytics)
+     */
+    public List<HisabResponse> getPaymentsForHostFiltered(
+            User host,
+            Integer eventId,
+            String guestName,
+            String guestPlace,
+            PaymentStatus status,
+            LocalDate fromDate,
+            LocalDate toDate) {
+        return moneyRepository.findByHostFiltered(
+                host,
+                eventId,
+                (guestName != null && !guestName.isBlank()) ? guestName : null,
+                (guestPlace != null && !guestPlace.isBlank()) ? guestPlace : null,
+                status,
+                fromDate,
+                toDate)
+            .stream()
+            .map(HisabResponse::from)
+            .toList();
     }
 
     /**

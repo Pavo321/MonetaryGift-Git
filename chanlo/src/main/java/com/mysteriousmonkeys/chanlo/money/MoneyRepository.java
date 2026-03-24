@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface MoneyRepository extends JpaRepository<Hisab, Integer> {
@@ -43,6 +44,27 @@ public interface MoneyRepository extends JpaRepository<Hisab, Integer> {
     List<Hisab> findByEventsOrderByStatusAndDate(@Param("events") List<Event> events);
 
     boolean existsByEventAndGuestAndPaymentStatus(Event event, User guest, PaymentStatus status);
+
+    @Query("""
+        SELECT h FROM Hisab h
+        WHERE h.event.host = :host
+          AND (:eventId IS NULL OR h.event.eventId = :eventId)
+          AND (:guestName IS NULL OR LOWER(h.guest.name) LIKE LOWER(CONCAT('%', :guestName, '%')))
+          AND (:guestPlace IS NULL OR LOWER(h.guest.village) LIKE LOWER(CONCAT('%', :guestPlace, '%')))
+          AND (:status IS NULL OR h.paymentStatus = :status)
+          AND (:fromDate IS NULL OR CAST(h.createdAt AS date) >= :fromDate)
+          AND (:toDate IS NULL OR CAST(h.createdAt AS date) <= :toDate)
+        ORDER BY h.createdAt DESC
+        """)
+    List<Hisab> findByHostFiltered(
+        @Param("host") User host,
+        @Param("eventId") Integer eventId,
+        @Param("guestName") String guestName,
+        @Param("guestPlace") String guestPlace,
+        @Param("status") PaymentStatus status,
+        @Param("fromDate") LocalDate fromDate,
+        @Param("toDate") LocalDate toDate
+    );
 
     @Query("SELECT h FROM Hisab h WHERE h.guest = :guest AND h.event.eventType = com.mysteriousmonkeys.chanlo.event.EventType.CAPACITY_EVENT ORDER BY h.createdAt DESC")
     List<Hisab> findCapacityEventsByGuest(@Param("guest") User guest);
