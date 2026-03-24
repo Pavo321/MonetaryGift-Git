@@ -41,6 +41,12 @@ public class User {
     @CreatedDate
     private LocalDateTime createdAt;
 
+    @Column(name = "is_active")
+    private boolean isActive = true;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public User() {}  // JPA requires a no-arg constructor
 
     public User(int id, String name, String village) {
@@ -151,6 +157,22 @@ public class User {
 
     public void setManagedBy(User managedBy) {
         this.managedBy = managedBy;
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public void setActive(boolean active) {
+        isActive = active;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
     }
 
     @Override

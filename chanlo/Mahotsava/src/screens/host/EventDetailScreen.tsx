@@ -243,18 +243,25 @@ export default function EventDetailScreen({route, navigation}: any) {
         onPress={() =>
           Alert.alert(
             'Delete Event',
-            'This will permanently delete the event and all its data. Make sure all helpers are settled first.',
+            `Move "${event.eventName}" to Trash?\n\nThe event will be hidden from your list. You can restore it within 30 days from the Dashboard.\n\nMake sure all helpers are settled first.`,
             [
               {text: 'Cancel', style: 'cancel'},
               {
-                text: 'Delete',
+                text: 'Move to Trash',
                 style: 'destructive',
                 onPress: async () => {
-                  const res = await api.deleteEvent(eventId);
-                  if (res.success) {
-                    navigation.goBack();
-                  } else {
-                    Alert.alert('Cannot Delete', res.message || 'Failed to delete event');
+                  setActionLoading(true);
+                  try {
+                    const res = await api.deleteEvent(eventId);
+                    if (res.success) {
+                      Alert.alert('Moved to Trash', 'Event moved to Trash. You can restore it from the Dashboard within 30 days.', [{text: 'OK', onPress: () => navigation.goBack()}]);
+                    } else {
+                      Alert.alert('Cannot Delete', res.message || 'Failed to delete event');
+                    }
+                  } catch {
+                    Alert.alert('Error', 'Network error. Please try again.');
+                  } finally {
+                    setActionLoading(false);
                   }
                 },
               },

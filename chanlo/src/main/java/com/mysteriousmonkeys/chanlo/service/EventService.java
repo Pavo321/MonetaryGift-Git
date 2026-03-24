@@ -168,9 +168,15 @@ public class EventService {
     public List<Event> getEventsByHost(int hostId) {
         var host = userRepository.findById(hostId)
             .orElseThrow(() -> new UserNotFoundException("Host not found"));
-        return eventRepository.findByHostOrderByEventIdDesc(host);
+        return eventRepository.findByHostAndDeletedAtIsNullOrderByEventIdDesc(host);
     }
-    
+
+    public List<Event> getDeletedEventsByHost(int hostId) {
+        var host = userRepository.findById(hostId)
+            .orElseThrow(() -> new UserNotFoundException("Host not found"));
+        return eventRepository.findByHostAndDeletedAtIsNotNullOrderByDeletedAtDesc(host);
+    }
+
     public Event findByQrCode(String qrCodeData) {
         return eventRepository.findByQrCodeData(qrCodeData)
             .orElseThrow(() -> new EventNotFoundException("Event not found for QR: " + qrCodeData));
@@ -217,7 +223,19 @@ public class EventService {
             throw new RuntimeException("Cannot delete event. Settle with helpers first: " + String.join(", ", unsettled));
         }
 
-        eventRepository.deleteById(eventId);
+        event.setDeletedAt(java.time.LocalDateTime.now());
+        eventRepository.save(event);
+    }
+
+    public void restoreEvent(int eventId, int hostId) {
+        Event event = eventRepository.findById(eventId)
+            .orElseThrow(() -> new EventNotFoundException("Event not found"));
+        if (event.getHost().getId() != hostId) throw new RuntimeException("Access denied");
+        if (event.getDeletedAt() == null) throw new RuntimeException("Event is not deleted");
+        long daysSince = java.time.temporal.ChronoUnit.DAYS.between(event.getDeletedAt(), java.time.LocalDateTime.now());
+        if (daysSince > 30) throw new RuntimeException("Event cannot be restored after 30 days");
+        event.setDeletedAt(null);
+        eventRepository.save(event);
     }
     
     /**

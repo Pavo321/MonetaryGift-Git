@@ -11,6 +11,10 @@ import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, Integer> {
     List<Event> findByHostOrderByEventIdDesc(User host);
+    // Active events only (deleted_at IS NULL)
+    List<Event> findByHostAndDeletedAtIsNullOrderByEventIdDesc(User host);
+    // Deleted events for trash section
+    List<Event> findByHostAndDeletedAtIsNotNullOrderByDeletedAtDesc(User host);
     List<Event> findByStatus(EventStatus status);
     Optional<Event> findByQrCodeData(String qrCodeData);
     List<Event> findByEventDateBetween(LocalDate start, LocalDate end);

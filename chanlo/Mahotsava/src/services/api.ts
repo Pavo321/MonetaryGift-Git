@@ -336,6 +336,15 @@ class ApiService {
     return this.mutate('/api/app/verify', 'POST', {qrData});
   }
 
+  // Event soft delete / restore
+  async getDeletedEvents() {
+    return this.get('/api/app/events/deleted');
+  }
+
+  async restoreEvent(eventId: number) {
+    return this.mutate(`/api/app/events/${eventId}/restore`, 'POST');
+  }
+
   // Analytics: get payments across all host events with filters
   async getAnalyticsPayments(params: {
     eventId?: number;

@@ -72,6 +72,28 @@ public class ChatbotService {
             String phone = normalizePhone(phoneNumber);
             String msg = message.trim();
 
+            // Deleted user check — handle RESTORE or inform
+            User maybeDeleted = userRepository.findByPhoneNumber(phone).orElse(null);
+            if (maybeDeleted != null && !maybeDeleted.isActive()) {
+                long daysSince = maybeDeleted.getDeletedAt() != null
+                    ? java.time.temporal.ChronoUnit.DAYS.between(maybeDeleted.getDeletedAt(), java.time.LocalDateTime.now())
+                    : 31;
+                if (msg.trim().equalsIgnoreCase("RESTORE")) {
+                    if (daysSince <= 30) {
+                        maybeDeleted.setActive(true);
+                        maybeDeleted.setDeletedAt(null);
+                        userRepository.save(maybeDeleted);
+                        states.remove(phone);
+                        return showMainMenu(phone, maybeDeleted.getName(), "Welcome back, " + maybeDeleted.getName() + "! Your account has been restored.");
+                    } else {
+                        return "Your account was deleted more than 30 days ago and cannot be recovered.\n\nSend your name to register fresh.";
+                    }
+                }
+                return daysSince <= 30
+                    ? "Your account was deleted " + daysSince + " day(s) ago.\n\nType *RESTORE* to recover it (within 30 days)."
+                    : "Your account has been permanently removed.\n\nSend your name to register fresh.";
+            }
+
             // QR scan: message starts with EVENT_ → event choice flow
             if (msg.toUpperCase().startsWith("EVENT_")) {
                 return handleQrScan(phone, msg.toUpperCase());
@@ -149,7 +171,8 @@ public class ChatbotService {
             Map.of("id", "MENU_1", "title", "Edit your details"),
             Map.of("id", "MENU_2", "title", "Get your QR"),
             Map.of("id", "MENU_3", "title", "Transaction history"),
-            Map.of("id", "MENU_4", "title", "Add a person")
+            Map.of("id", "MENU_4", "title", "Add a person"),
+            Map.of("id", "MENU_5", "title", "Delete my account")
         ));
         return "";
     }
@@ -227,6 +250,9 @@ public class ChatbotService {
             case GIFT_AMOUNT -> handleGiftAmount(phone, msg, state);
             case GIFT_CONFIRM -> handleGiftConfirm(phone, msg, state);
 
+            // Account deletion confirmation
+            case DELETE_CONFIRM -> handleDeleteConfirm(phone, msg, state);
+
             default -> {
                 states.remove(phone);
                 yield startConversation(phone);
@@ -281,6 +307,10 @@ public class ChatbotService {
             case "2" -> handleActionOrPick(phone, state, "QR");
             case "3" -> handleActionOrPick(phone, state, "HIST");
             case "4" -> { state.step = Step.ADD_PERSON_NAME; yield "Add a family member or person without WhatsApp.\n\nEnter their name:"; }
+            case "5" -> {
+                state.step = Step.DELETE_CONFIRM;
+                yield "⚠️ *Delete Account*\n\nAre you sure you want to delete your account?\n\nAll your data will be removed. You can restore your account within 30 days by typing *RESTORE*.\n\nType *YES* to confirm or *NO* to cancel.";
+            }
             default -> showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
         };
     }
@@ -781,6 +811,33 @@ public class ChatbotService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // ACCOUNT DELETION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private String handleDeleteConfirm(String phone, String msg, ConversationState state) {
+        String upper = msg.trim().toUpperCase();
+        if ("YES".equals(upper)) {
+            try {
+                User user = userRepository.findByPhoneNumber(phone).orElse(null);
+                if (user != null) {
+                    user.setActive(false);
+                    user.setDeletedAt(java.time.LocalDateTime.now());
+                    userRepository.save(user);
+                }
+            } catch (Exception e) {
+                log.error("Error deleting user account: {}", e.getMessage(), e);
+            }
+            states.remove(phone);
+            return "Your account has been deleted.\n\nType *RESTORE* within 30 days to recover your account and all data.";
+        } else if ("NO".equals(upper)) {
+            state.step = Step.WAITING_MAIN_CHOICE;
+            return showMainMenu(phone, state.activeUserName != null ? state.activeUserName : "");
+        } else {
+            return "Type *YES* to confirm deletion or *NO* to cancel.";
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // VIEW PAYMENTS FOR EVENT
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -914,6 +971,8 @@ public class ChatbotService {
         // Event choice (QR scan)
         EVENT_CHOICE,
         // Gift flow
-        GIFT_NAME, GIFT_PLACE, GIFT_AMOUNT, GIFT_CONFIRM
+        GIFT_NAME, GIFT_PLACE, GIFT_AMOUNT, GIFT_CONFIRM,
+        // Account deletion confirmation
+        DELETE_CONFIRM
     }
 }

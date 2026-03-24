@@ -212,6 +212,49 @@ public class MahotsavaController {
         }
     }
 
+    /**
+     * Get deleted events (trash) for current host
+     * GET /api/app/events/deleted
+     */
+    @GetMapping("/events/deleted")
+    public ResponseEntity<?> getDeletedEvents(@RequestHeader("Authorization") String authHeader) {
+        AuthService.AuthSession session = validateAuth(authHeader);
+        if (session == null) return unauthorized();
+
+        List<com.mysteriousmonkeys.chanlo.event.Event> deleted = eventService.getDeletedEventsByHost(session.userId());
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        List<Map<String, Object>> result = deleted.stream().map(e -> {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(e.getDeletedAt(), now);
+            Map<String, Object> m = new HashMap<>();
+            m.put("eventId", e.getEventId());
+            m.put("eventName", e.getEventName());
+            m.put("eventDate", e.getEventDate().toString());
+            m.put("deletedAt", e.getDeletedAt().toString());
+            m.put("daysAgo", days);
+            m.put("canRestore", days <= 30);
+            return m;
+        }).toList();
+        return ResponseEntity.ok(Map.of("success", true, "events", result));
+    }
+
+    /**
+     * Restore a soft-deleted event
+     * POST /api/app/events/{eventId}/restore
+     */
+    @PostMapping("/events/{eventId}/restore")
+    public ResponseEntity<?> restoreEvent(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable int eventId) {
+        AuthService.AuthSession session = validateAuth(authHeader);
+        if (session == null) return unauthorized();
+        try {
+            eventService.restoreEvent(eventId, session.userId());
+            return ResponseEntity.ok(Map.of("success", true, "message", "Event restored"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     // ==================== HELPER MANAGEMENT (Host) ====================
 
     /**

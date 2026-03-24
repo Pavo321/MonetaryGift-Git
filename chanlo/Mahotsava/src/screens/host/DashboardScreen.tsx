@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {useState, useCallback, useEffect, Alert} from 'react';
 import {
   View,
   FlatList,
@@ -18,6 +18,8 @@ import {api} from '../../services/api';
 
 export default function DashboardScreen({navigation}: any) {
   const [events, setEvents] = useState<any[]>([]);
+  const [deletedEvents, setDeletedEvents] = useState<any[]>([]);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,11 +46,48 @@ export default function DashboardScreen({navigation}: any) {
     }
   }, []);
 
+  const loadDeletedEvents = useCallback(async () => {
+    try {
+      const res = await api.getDeletedEvents();
+      if (res.success) {
+        setDeletedEvents(res.events || []);
+      }
+    } catch (e) {
+      console.error('Failed to load deleted events', e);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadEvents();
-    }, [loadEvents]),
+      loadDeletedEvents();
+    }, [loadEvents, loadDeletedEvents]),
   );
+
+  const handleRestore = useCallback((eventId: number, eventName: string) => {
+    Alert.alert(
+      'Restore Event',
+      `Restore "${eventName}"?`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Restore',
+          onPress: async () => {
+            try {
+              const res = await api.restoreEvent(eventId);
+              if (res.success) {
+                await Promise.all([loadEvents(), loadDeletedEvents()]);
+              } else {
+                Alert.alert('Error', res.message || 'Could not restore event.');
+              }
+            } catch {
+              Alert.alert('Error', 'Failed to restore event.');
+            }
+          },
+        },
+      ],
+    );
+  }, [loadEvents, loadDeletedEvents]);
 
   const totalCollected = events.reduce((sum, e) => sum + (e.totalAmount || 0), 0);
   const totalGifts = events.reduce((sum, e) => sum + (e.totalGiftsReceived || 0), 0);
@@ -178,6 +217,39 @@ export default function DashboardScreen({navigation}: any) {
             message="Create your first event to start collecting"
           />
         }
+        ListFooterComponent={
+          deletedEvents.length > 0 ? (
+            <View style={styles.trashSection}>
+              <TouchableOpacity style={styles.trashHeader} onPress={() => setTrashOpen(o => !o)} activeOpacity={0.7}>
+                <Ionicons name="trash-outline" size={16} color={colors.textMuted} />
+                <Text style={styles.trashTitle}>Deleted Events ({deletedEvents.length})</Text>
+                <Ionicons name={trashOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              {trashOpen && deletedEvents.map(item => (
+                <View key={String(item.eventId)} style={styles.trashRow}>
+                  <View style={{flex: 1}}>
+                    <Text style={styles.trashName} numberOfLines={1}>{item.eventName}</Text>
+                    <Text style={styles.trashMeta}>
+                      {item.canRestore
+                        ? `Deleted ${item.daysAgo} day${item.daysAgo === 1 ? '' : 's'} ago`
+                        : 'Permanently deleted'}
+                    </Text>
+                  </View>
+                  {item.canRestore ? (
+                    <TouchableOpacity
+                      style={styles.restoreBtn}
+                      onPress={() => handleRestore(item.eventId, item.eventName)}
+                      activeOpacity={0.7}>
+                      <Text style={styles.restoreBtnText}>Restore</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.permanentText}>Expired</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -296,5 +368,62 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
     marginTop: 2,
+  },
+  trashSection: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xxl,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  trashHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  trashTitle: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  trashRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    gap: spacing.sm,
+  },
+  trashName: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textSecondary ?? colors.textMuted,
+  },
+  trashMeta: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  restoreBtn: {
+    backgroundColor: colors.primaryLight ?? '#E3F2FD',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: borderRadius.md,
+  },
+  restoreBtnText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  permanentText: {
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    fontStyle: 'italic',
   },
 });

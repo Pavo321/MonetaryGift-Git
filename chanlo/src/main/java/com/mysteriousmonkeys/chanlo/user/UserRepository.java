@@ -9,6 +9,7 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByPhoneNumber(String phoneNumber);
+    Optional<User> findByPhoneNumberAndIsActiveTrue(String phoneNumber);
     List<User> findByRole(UserRole role);
     boolean existsByPhoneNumber(String phoneNumber);
     List<User> findByManagedBy(User managedBy);
